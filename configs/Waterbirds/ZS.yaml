@@ -1,0 +1,20 @@
+EXP:
+  ADVICE_METHOD: "CLIPZS"
+  WANDB_SILENT: False
+  PROJ: "Waterbirds"
+  SEED: 0
+  TEXT_PROMPTS: ['landbird', 'waterbird']
+  TEMPLATES: 'waterbirds_templates'
+  
+DATA:
+  DATASET: "Waterbirds"
+  BATCH_SIZE: 32
+  LOAD_CACHED: True
+  UPWEIGHT_CLASSES: True
+
+METHOD:
+  MODEL:
+    NUM_LAYERS: 1
+    SEPERATE_CLASSES: True
+    RESUME: True
+  NORMALIZE: False

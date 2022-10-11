@@ -1,0 +1,18 @@
+EXP:
+  ADVICE_METHOD: "CLIPZS"
+  WANDB_SILENT: False
+  PROJ: "CUB_Painting"
+  SEED: 0
+  TEXT_PROMPTS: ["a photo of a {}"]
+  TEMPLATES: 'cub_template'
+  
+DATA:
+  DATASET: "CUB"
+  BATCH_SIZE: 32
+
+METHOD:
+  MODEL:
+    NUM_LAYERS: 1
+    SEPERATE_CLASSES: True
+    RESUME: True
+  NORMALIZE: False

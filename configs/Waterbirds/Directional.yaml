@@ -1,0 +1,35 @@
+EXP:
+  ADVICE_METHOD: "ClipMLP"
+  WANDB_SILENT: False
+  PROJ: "Waterbirds"
+  SEED: 0
+  TEXT_PROMPTS: ['a photo of a {} on water.']
+  NEUTRAL_TEXT_PROMPTS: ['a photo of a {} on land.']
+  AUGMENTATION: 'Directional'
+  EPOCHS: 200
+  LOG_HIST: True
+  CHECKPOINT_VAL: True
+  
+  
+DATA:
+  DATASET: "Waterbirds"
+  LOAD_CACHED: True
+
+METHOD:
+  MODEL:
+    NUM_LAYERS: 1
+    DOM_WEIGHT: 1.0
+    LR: 0.005
+    WEIGHT_DECAY: 0.005
+    CHECKPOINT: 'checkpoint/mlp_simple.pth'
+    CHECKPOINT_NAME: 'DomainNetMini/mlp-directional'
+    RESUME: False
+  USE_DOM_GT: True
+
+AUGMENTATION:
+  MODEL:
+    LR: 0.0005
+    WEIGHT_DECAY: 0.005
+    NUM_LAYERS: 1
+  EPOCHS: 10
+  GENERIC: False

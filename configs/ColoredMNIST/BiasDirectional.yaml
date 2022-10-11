@@ -1,0 +1,37 @@
+EXP:
+  ADVICE_METHOD: "ClipMLP"
+  WANDB_SILENT: False
+  PROJ: "BiasDirectional"
+  SEED: 0
+  # TEXT_PROMPTS: [["clipart"], ["painting"], ["real photo"]]
+  # TEXT_PROMPTS: [['painting']]
+  # TEXT_PROMPTS: ['a photo of a red number "{}".', 'a photo of a green number "{}".']
+  TEXT_PROMPTS: [['a photo of a red number.'], ['a photo of a blue number.']]
+  # TEXT_PROMPTS: ['a photo of a red number "{}".', 'a photo of a blue number "{}".']
+  # NEUTRAL_TEXT_PROMPTS: [['a photo of a number.']]
+  AUGMENTATION: 'BiasDirectional'
+  EPOCHS: 200
+  LOG_HIST: True
+  CHECKPOINT_VAL: True
+  
+  
+DATA:
+  DATASET: "ColoredMNISTBinary"
+  LOAD_CACHED: True
+
+METHOD:
+  MODEL:
+    NUM_LAYERS: 1
+    DOM_WEIGHT: 1.0
+    LR: 0.001
+    WEIGHT_DECAY: 0.05
+    CHECKPOINT: 'checkpoint/mlp_simple.pth'
+    CHECKPOINT_NAME: 'DomainNetMini/mlp-directional'
+    RESUME: False
+  USE_DOM_GT: False
+
+AUGMENTATION:
+  EPOCHS: 50
+  GENERIC: True
+  DOM_SPECIFIC_XE: False
+  DOM_LABELS: ["red", "blue"]

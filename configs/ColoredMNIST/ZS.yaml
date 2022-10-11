@@ -1,0 +1,18 @@
+EXP:
+  ADVICE_METHOD: "CLIPZS"
+  WANDB_SILENT: False
+  PROJ: "ColoredMNISTBinary2"
+  SEED: 0
+  TEXT_PROMPTS: ['0','1','2','3','4','5','6','7','8','9']
+  TEMPLATES: 'color_mnist_templates'
+  
+DATA:
+  DATASET: "ColoredMNISTBinary"
+  BATCH_SIZE: 64
+
+METHOD:
+  MODEL:
+    NUM_LAYERS: 1
+    SEPERATE_CLASSES: True
+    RESUME: True
+  NORMALIZE: False

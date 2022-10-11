@@ -1,0 +1,60 @@
+EXP:
+  ADVICE_METHOD: "CLIPZS"
+  WANDB_SILENT: False
+  PROJ: "CLIPInvariance_DomainNetMini"
+  SEED: 0
+  TEXT_PROMPTS: ['airplane',
+ 'ambulance',
+ 'apple',
+ 'backpack',
+ 'banana',
+ 'bathtub',
+ 'bear',
+ 'bed',
+ 'bee',
+ 'bicycle',
+ 'bird',
+ 'book',
+ 'bridge',
+ 'bus',
+ 'butterfly',
+ 'cake',
+ 'calculator',
+ 'camera',
+ 'car',
+ 'cat',
+ 'chair',
+ 'clock',
+ 'cow',
+ 'dog',
+ 'dolphin',
+ 'donut',
+ 'drums',
+ 'duck',
+ 'elephant',
+ 'fence',
+ 'fork',
+ 'horse',
+ 'house',
+ 'rabbit',
+ 'scissors',
+ 'sheep',
+ 'strawberry',
+ 'table',
+ 'telephone',
+ 'truck']
+  TEMPLATES: 'domainnet_mini_templates'
+  LOG_HIST: False
+  
+DATA:
+  DATASET: "DomainNetMini"
+  BATCH_SIZE: 64
+  LOAD_CACHED: True
+  UPWEIGHT_CLASSES: True
+
+METHOD:
+  MODEL:
+    NUM_LAYERS: 1
+    SEPERATE_CLASSES: True
+    RESUME: True
+  NORMALIZE: True

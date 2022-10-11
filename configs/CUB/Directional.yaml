@@ -1,0 +1,40 @@
+EXP:
+  ADVICE_METHOD: "ClipMLP"
+  WANDB_SILENT: False
+  PROJ: "CUB_Painting"
+  SEED: 0
+  # TEXT_PROMPTS: [["clipart"], ["painting"], ["real photo"]]
+  # TEXT_PROMPTS: [['a painting of a bird']]
+  TEXT_PROMPTS: ['a painting of a {} bird.']
+  # TEXT_PROMPTS: ['an anime drawing of a {} bird.']
+  NEUTRAL_TEXT_PROMPTS: ['a photo of a {} bird.']
+  # NEUTRAL_TEXT_PROMPTS: [['a photo of a bird']]
+  AUGMENTATION: 'Directional'
+  EPOCHS: 200
+  LOG_HIST: True
+  ENSAMBLE: True
+  
+  
+DATA:
+  DATASET: "CUB"
+  LOAD_CACHED: True
+  BATCH_SIZE: 256
+
+METHOD:
+  MODEL:
+    NUM_LAYERS: 1
+    DOM_WEIGHT: 1.0
+    LR: 0.001
+    WEIGHT_DECAY: 0.05
+    CHECKPOINT: 'checkpoint/mlp_simple.pth'
+    CHECKPOINT_NAME: 'CUB/mlp-directional'
+    RESUME: False
+  USE_DOM_GT: True
+
+AUGMENTATION:
+  MODEL:
+    LR: 0.1
+    WEIGHT_DECAY: 0.05
+    NUM_LAYERS: 1
+  GENERIC: False
+  DOM_LABELS: ['painting']

@@ -1,0 +1,24 @@
+EXP:
+  ADVICE_METHOD: "ClipMLP"
+  WANDB_SILENT: False
+  PROJ: "BiasDirectional_E2E"
+  SEED: 0
+  TEXT_PROMPTS: ['a photo of a red number "{}".', 'a photo of a blue number "{}".']
+  NEUTRAL_TEXT_PROMPTS: ['a photo of a white number "{}".']
+  EPOCHS: 200
+  CHECKPOINT_VAL: True
+  GENERIC: False
+  LOG_HIST: True
+
+DATA:
+  DATASET: "ColoredMNISTBinary"
+
+METHOD:
+  MODEL:
+    NUM_LAYERS: 1
+    DOM_WEIGHT: 1.0
+    LR: 0.001
+    WEIGHT_DECAY: 0.05
+    CHECKPOINT: 'checkpoint/mlp_simple.pth'
+    RESUME: False
+  USE_DOM_GT: True

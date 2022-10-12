@@ -96,7 +96,6 @@ prompts = list(args.EXP.TEXT_PROMPTS)
 assert type(prompts[0]) == str, "CLIP ZS only takes one word per class"
 
 if args.DATA.LOAD_CACHED ==  False:
-    data_dir = '/'.join(args.DATA.SAVE_PATH.split('/')[:-1])
     trainset, valset, testset = dh.get_dataset(DATASET_NAME, preprocess, biased_val=args.EXP.BIASED_VAL)
     dataset_classes = dh.get_class(DATASET_NAME)
     dataset_domains = dh.get_domain(DATASET_NAME)
@@ -123,6 +122,7 @@ if args.DATA.LOAD_CACHED ==  False:
         "test_domains": test_domains,
         "test_filenames": test_filenames
     }
+    data_dir = '/'.join(args.DATA.SAVE_PATH.split('/')[:-1])
     if not os.path.exists(args.DATA.SAVE_PATH):
         os.makedirs(data_dir)
     torch.save(data, args.DATA.SAVE_PATH)

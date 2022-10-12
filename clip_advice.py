@@ -160,6 +160,9 @@ if args.DATA.LOAD_CACHED ==  False:
         "test_domains": test_domains,
         "test_filenames": test_filenames
     }
+    data_dir = '/'.join(args.DATA.SAVE_PATH.split('/')[:-1])
+    if not os.path.exists(args.DATA.SAVE_PATH):
+        os.makedirs(data_dir)
     torch.save(data, args.DATA.SAVE_PATH)
     if args.METHOD.NORMALIZE:
         train_features /= np.linalg.norm(train_features, axis=-1, keepdims=True)

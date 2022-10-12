@@ -21,9 +21,9 @@ dependencies:
 - pillow=8.1.1
 - pip:
     - tensorboardx==1.8
-    - robustness
     - omegaconf
     - wandb
+    - sklearn
     - cox
     - ftfy
     - regex
@@ -35,4 +35,5 @@ dependencies:
     - pytorch_adapt
     - transformers
     - pytorch_revgrad
-    - open_clip
+    - open_clip_torch
+    - git+https://github.com/openai/CLIP.git

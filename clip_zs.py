@@ -13,9 +13,8 @@ from sklearn.metrics import confusion_matrix
 from utils import read_unknowns, nest_dict
 
 import helpers.data_helpers as dh
-import helpers.clip_transformations as CLIPTransformations
+import methods.clip_transformations as CLIPTransformations
 import helpers.text_templates
-from helpers.clip_transformations import evaluate
 from clip_utils import get_features
 import ast
 
@@ -39,7 +38,7 @@ if len(unknown) > 0:
     args = OmegaConf.merge(args, to_merge)
 args.yaml = flags.config
 
-assert args.EXP.ADVICE_METHOD == 'CLIPZS', "clip_zs.py onyl for CLIPZS baseline, use train.py or clip_advice.py"
+assert args.EXP.ADVICE_METHOD == 'CLIPZS', "clip_zs.py only for CLIPZS baseline, use train.py or clip_advice.py"
 
 if args.EXP.WANDB_SILENT:
     os.environ['WANDB_SILENT']="true"
@@ -74,6 +73,7 @@ if args.DATA.LOAD_CACHED:
     else:
         model_name = args.EXP.IMAGE_FEATURES
     cache_file, dataset_classes, dataset_domains = dh.get_cache_file(DATASET_NAME, model_name, args.EXP.BIASED_VAL, args.EXP.IMAGE_FEATURES)
+    assert os.path.exists(cache_file), f"{cache_file} does not exist. To compute embeddings, set DATA.LOAD_CACHED=True"
     data = torch.load(cache_file)
     train_features, train_labels, train_groups, train_domains = data['train_features'], data['train_labels'], data['train_groups'], data['train_domains']
     val_features, val_labels, val_groups, val_domains = data['val_features'], data['val_labels'], data['val_groups'], data['val_domains']
@@ -96,6 +96,7 @@ prompts = list(args.EXP.TEXT_PROMPTS)
 assert type(prompts[0]) == str, "CLIP ZS only takes one word per class"
 
 if args.DATA.LOAD_CACHED ==  False:
+    data_dir = '/'.join(args.DATA.SAVE_PATH.split('/')[:-1])
     trainset, valset, testset = dh.get_dataset(DATASET_NAME, preprocess, biased_val=args.EXP.BIASED_VAL)
     dataset_classes = dh.get_class(DATASET_NAME)
     dataset_domains = dh.get_domain(DATASET_NAME)
@@ -122,6 +123,8 @@ if args.DATA.LOAD_CACHED ==  False:
         "test_domains": test_domains,
         "test_filenames": test_filenames
     }
+    if not os.path.exists(args.DATA.SAVE_PATH):
+        os.makedirs(data_dir)
     torch.save(data, args.DATA.SAVE_PATH)
 
 testset = CLIPTransformations.EmbeddingDataset(args, test_features, test_labels, test_groups, test_domains)

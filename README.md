@@ -11,6 +11,19 @@ Official Implementation of LADS (Latent Augmentation using Domain descriptionS)
 - [ ] upload clip emb to gdrive to download
 - [ ] upload checkpoints
 
+## Getting started
+
+1. Clone this repo (or if you are working with me fork this repo)
+
+2. Install the dependencies for our code using Conda. You may need to adjust the environment YAML file depending on your setup.
+
+    ```
+    conda env create -f environment.yaml
+    ```
+3. Launch your environment with `conda activate LADS` or `source activate LADS`
+
+4. Fix any misc bugs that you find :p
+
 ## Code Structure 
 The configurations for each method are in the `configs` folder. To try say the baseline of doing normal LR on the CLIP embeddings:
 ```
@@ -46,17 +59,6 @@ This sets the type of linear probing you are doing. Set to `LR` if you want to u
 
 You can also set the advice method to one of the debiasing methods (different from augmentations in that we augment the training data and dont add in the original training data), but we don't use them anymore and I'm too lazy to explain it so if you care to try them out check the configs file (WARNING these are old so high chance of bugs).
 
-## Running LR
-
-If you want to simply run logistic regression on the embeddings, run the `mlp.yaml` file in any of the config folders. Some of the methods we have dont require any training (e.g. HardDebias), so all those do is perform a transformation on the embeddings before we do the logistic regression. 
-
-Note: you do need to save the embeddings for each model in the `helpers/dataset_helpers.py` folder.
-
-For example, to run LR on CLIP with a resnet50 backbone on ColoredMNIST, run
-```
-python clip_advice.py --config configs/ColoredMNIST/mlp.yaml
-```
-
 ## Running CLIP Zero-Shot
 In order to run the CLIP zero-shot baseline, set `EXP.ADVICE_METHOD=CLIPZS` and run the `clip_zs.py` file instead of `clip_advice.py` file. 
 
@@ -68,6 +70,17 @@ python clip_zs.py --config configs/Waterbirds/ZS.yaml
 CLIP text templates are located in `helpers/text_templates.py`, and you can specify which template you want with the `EXP.TEMPLATES` parameter. 
 
 Also note that we use the classes given in `EXP.PROMPTS` instead of the dataset classes in the dataset object itself so make sure to set those correctly.
+
+## Running LR
+
+If you want to simply run logistic regression on the embeddings, run the `mlp.yaml` file in any of the config folders. Some of the methods we have dont require any training (e.g. HardDebias), so all those do is perform a transformation on the embeddings before we do the logistic regression. 
+
+Note: you do need to save the embeddings for each model in the `helpers/dataset_helpers.py` folder.
+
+For example, to run LR on CLIP with a resnet50 backbone on ColoredMNIST, run
+```
+python clip_advice.py --config configs/ColoredMNIST/mlp.yaml
+```
 
 ## Directional Loss
 The directional loss is an augmentation (so augment the training data and add it back in to the original). Its parameters are under the `AUGMENTATION` section of the config files. 

@@ -1,0 +1,77 @@
+SEED: 0
+
+
+DATA:
+  BATCH_SIZE: 128
+  NUM_WORKERS: 4
+
+  # Size of training images (square)
+  SIZE: 224
+
+  # Mean and std deviation to use, found in datasets/__init__.py
+  NORMALIZATION: 'imagenet'
+
+  ATTENTION_DIR: "NONE"
+  USE_GROUP_WEIGHTS: False
+  SEPARATE_CLASSES: True
+
+  BALANCE_AVERAGE_MODE: "mean" # mean, harmonic_mean
+
+  REMOVE_BACKGROUND: False
+  MASK_PIXELS: False
+  ROOT: "/shared/lisabdunlap/vl-attention/data"
+
+EXP:
+  FREEZE_BACKBONE: False
+  BIAS_DETECTION: False
+  SAL_LAYER: 'layer4.2.relu'
+  LOG_GCAMS: True
+  ATTN_PER_CLASS: False
+
+  LOSSES:
+    CLASSIFICATION:
+      WEIGHT: 1
+    GRADIENT_OUTSIDE:
+      COMPUTE: False
+      LOG: False
+      WEIGHT: 0.01
+      CRITERION: "L1"
+      GT: "segmentation"
+      COMBINE_ATT_MODE: "average_nonzero"
+    GRADIENT_INSIDE:
+      COMPUTE: False
+      LOG: False
+      WEIGHT: 1
+      CRITERION: "L1"
+      GT: "segmentation"
+      COMBINE_ATT_MODE: "average_nonzero"
+    GRADCAM:
+      COMPUTE: False
+      LOG: False
+      WEIGHT: 1
+      CRITERION: "L1"
+      GT: "segmentation"
+      MODE: "match" # match, suppress_outside
+      COMBINE_ATT_MODE: "average_nonzero"
+
+LOGGING:
+  # save model every save_every # of epochs. if 0, don't save model on a regular basis
+  SAVE_EVERY: 0
+
+  # save best model (updates throughout training)
+  SAVE_BEST: True
+
+  # save last model (updates throughout training)
+  SAVE_LAST: False
+
+  # Logging attention.
+  # Step is # epochs b/w logging. Would also log attention before training and at end.
+  LOG_ATTENTION: False
+  LOG_ATTENTION_STEP: 10
+
+  SAVE_CONFUSION_MATRIX: False
+  SAVE_CONFUSION_MATRIX_PATH: "NONE"
+
+  # Save stats over multiple runs to a CSV file.
+  # Gathering stats over multiple trials can also be done by setting EXP.NUM_TRIALS.
+  SAVE_STATS_PATH: "NONE"

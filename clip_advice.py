@@ -25,7 +25,7 @@ import random
 from sklearn.metrics import confusion_matrix
 from utils import read_unknowns, nest_dict
 
-import helpers.clip_transformations as CLIPTransformations
+import methods.clip_transformations as CLIPTransformations
 
 from clip_utils import get_features, evaluate, zeroshot_classifier, get_ensamble_preds, get_pred_overlap
 import clip_utils as cu
@@ -94,6 +94,7 @@ if args.DATA.LOAD_CACHED:
     else:
         model_name = args.EXP.IMAGE_FEATURES
     cache_file, dataset_classes, dataset_domains = dh.get_cache_file(DATASET_NAME, model_name, args.EXP.BIASED_VAL, args.EXP.IMAGE_FEATURES)
+    assert os.path.exists(cache_file), f"{cache_file} does not exist. To compute embeddings, set DATA.LOAD_CACHED=True"
     data = torch.load(cache_file)
     train_features, train_labels, train_groups, train_domains, train_filenames = data['train_features'], data['train_labels'], data['train_groups'], data['train_domains'], data['train_filenames']
     val_features, val_labels, val_groups, val_domains, val_filenames = data['val_features'], data['val_labels'], data['val_groups'], data['val_domains'], data['val_filenames']

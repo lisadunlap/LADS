@@ -9,6 +9,7 @@ EXP:
 DATA:
   DATASET: "CUB"
   BATCH_SIZE: 32
+  SAVE_PATH: "data/CUB/save.pth"
 
 METHOD:
   MODEL:

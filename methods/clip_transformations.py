@@ -597,10 +597,18 @@ class ClipMLP(Noop):
             "epoch": epoch,
             "net": self.net.state_dict()
         }
+        try: 
+            os.mkdir("./checkpoint")
+        except: 
+            pass 
         if last:
             torch.save(state, f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth')
             wandb.save(f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth')
         else:
+            # make checkpoint directory and DomainNetMini directory
+            print('================')
+            print(self.cfg.METHOD.MODEL.CHECKPOINT_NAME)
+            print('================')
             torch.save(state, f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth')
             wandb.save(f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth')
 

@@ -1,12 +1,12 @@
 EXP:
-  ADVICE_METHOD: "Noop"
+  ADVICE_METHOD: "ClipMLP"
   WANDB_SILENT: False
   PROJ: "Debug_Directional"
   SEED: 0
   # TEXT_PROMPTS: [["clipart"], ["painting"], ["real photo"]]
   # TEXT_PROMPTS: [['painting']]
-  TEXT_PROMPTS: [['a painting of an object.']]
-  NEUTRAL_TEXT_PROMPTS: [['a sketch of an object.']]
+  TEXT_PROMPTS: ['a realistic photo of a {}', 'a painting of a {}', 'clipart of a {}']
+  NEUTRAL_TEXT_PROMPTS: ['a sketch of a {}']
   AUGMENTATION: 'Directional'
   EPOCHS: 200
   LOG_HIST: True
@@ -15,6 +15,8 @@ EXP:
 DATA:
   DATASET: "DomainNetMini"
   LOAD_CACHED: True
+  SAVE_PATH: "data/DomainNetMini/save.pth"
+  BATCH_SIZE: 256
 
 METHOD:
   MODEL:
@@ -22,7 +24,7 @@ METHOD:
     DOM_WEIGHT: 1.0
     LR: 0.001
     CHECKPOINT: 'checkpoint/mlp_simple.pth'
-    CHECKPOINT_NAME: 'DomainNetMini/mlp-directional'
+    CHECKPOINT_NAME: 'DomainNetMini-mlp-directional'
     RESUME: False
   USE_DOM_GT: True
 
@@ -32,5 +34,5 @@ AUGMENTATION:
     WEIGHT_DECAY: 0.005
     NUM_LAYERS: 1
   EPOCHS: 10
-  GENERIC: True
+  GENERIC: False
   ALPHA: 0.5

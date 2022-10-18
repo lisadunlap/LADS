@@ -64,6 +64,8 @@ np.random.seed(args.EXP.SEED)
 
 DATASET_NAME = args.DATA.DATASET
 
+print(args.DATA.LOAD_CACHED)
+
 # load data
 if args.DATA.LOAD_CACHED:
     if args.EXP.IMAGE_FEATURES == 'clip':
@@ -123,8 +125,9 @@ if args.DATA.LOAD_CACHED ==  False:
         "test_filenames": test_filenames
     }
     data_dir = '/'.join(args.DATA.SAVE_PATH.split('/')[:-1])
-    if not os.path.exists(args.DATA.SAVE_PATH):
-        os.makedirs(data_dir)
+
+#    if not os.path.exists(args.DATA.SAVE_PATH):
+#        os.makedirs(data_dir)
     torch.save(data, args.DATA.SAVE_PATH)
 
 testset = CLIPTransformations.EmbeddingDataset(args, test_features, test_labels, test_groups, test_domains)

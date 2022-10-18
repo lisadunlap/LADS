@@ -29,7 +29,7 @@ import methods.clip_transformations as CLIPTransformations
 
 from clip_utils import get_features, evaluate, zeroshot_classifier, get_ensamble_preds, get_pred_overlap
 import clip_utils as cu
-import Augmentations.augmentations
+import methods.augmentations
 
 
 from omegaconf import OmegaConf
@@ -87,14 +87,12 @@ DATASET_NAME = args.DATA.DATASET
 # load data
 if args.DATA.LOAD_CACHED:
     print(args.DATA.LOAD_CACHED)
-    if args.EXP.IMAGE_FEATURES == 'clip':
+    if args.EXP.IMAGE_FEATURES == 'clip' or args.EXP.IMAGE_FEATURES == 'openclip':
         model_name = args.EXP.CLIP_MODEL
-    elif args.EXP.IMAGE_FEATURES == 'openclip':
-        model_name = args.EXP.CLIP_MODEL[0]
     else:
         model_name = args.EXP.IMAGE_FEATURES
     cache_file, dataset_classes, dataset_domains = dh.get_cache_file(DATASET_NAME, model_name, args.EXP.BIASED_VAL, args.EXP.IMAGE_FEATURES)
-    assert os.path.exists(cache_file), f"{cache_file} does not exist. To compute embeddings, set DATA.LOAD_CACHED=True"
+    assert os.path.exists(cache_file), f"{cache_file} does not exist. To compute embeddings, set DATA.LOAD_CACHED=False"
     data = torch.load(cache_file)
     train_features, train_labels, train_groups, train_domains, train_filenames = data['train_features'], data['train_labels'], data['train_groups'], data['train_domains'], data['train_filenames']
     val_features, val_labels, val_groups, val_domains, val_filenames = data['val_features'], data['val_labels'], data['val_groups'], data['val_domains'], data['val_filenames']
@@ -115,7 +113,7 @@ if args.EXP.IMAGE_FEATURES == 'clip':
     clip_model, preprocess = clip.load(args.EXP.CLIP_MODEL, device)
     model, preprocess = clip.load(args.EXP.CLIP_MODEL, device)
 elif args.EXP.IMAGE_FEATURES == 'openclip':
-    model, _, preprocess = open_clip.create_model_and_transforms(args.EXP.CLIP_MODEL[0], pretrained=args.EXP.CLIP_MODEL[1])
+    model, _, preprocess = open_clip.create_model_and_transforms(args.EXP.CLIP_MODEL, pretrained=args.EXP.CLIP_PRETRAINED_DATASET)
     model = model.to(torch.device('cuda:0'))
     clip_model = model
 else:
@@ -190,9 +188,9 @@ num_augmentations = 1
 if args.EXP.AUGMENTATION != None and args.EXP.AUGMENTATION != 'None':
     print("Augmenting training set...")
     if "Directional" in args.EXP.AUGMENTATION:
-        augment = getattr(Augmentations.augmentations, args.EXP.AUGMENTATION)(args, train_features, train_labels, train_groups, train_domains, train_filenames, bias_correction.text_embeddings, val_features, val_labels, val_groups, val_domains, val_filenames)
+        augment = getattr(methods.augmentations, args.EXP.AUGMENTATION)(args, train_features, train_labels, train_groups, train_domains, train_filenames, bias_correction.text_embeddings, val_features, val_labels, val_groups, val_domains, val_filenames)
     else:
-        augment = getattr(Augmentations.augmentations, args.EXP.AUGMENTATION)(args, train_features, train_labels, train_groups, train_domains, train_filenames, bias_correction.text_embeddings)
+        augment = getattr(methods.augmentations, args.EXP.AUGMENTATION)(args, train_features, train_labels, train_groups, train_domains, train_filenames, bias_correction.text_embeddings)
     train_features, train_labels, train_domains, train_groups, train_filenames = augment.augment_dataset()
     print(train_features.shape, train_labels.shape, train_groups.shape, train_domains.shape)
 

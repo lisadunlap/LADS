@@ -6,6 +6,7 @@ Official Implementation of LADS (Latent Augmentation using Domain descriptionS)
 
 ## TODO
 
+- [X] check ZS works 
 - [ ] finish readme
 - [ ] check everything works (I would be surprised if anything runs rn)
 - [ ] upload clip emb to gdrive to download
@@ -13,16 +14,16 @@ Official Implementation of LADS (Latent Augmentation using Domain descriptionS)
 
 ## Getting started
 
-1. Clone this repo (or if you are working with me fork this repo)
-
-2. Install the dependencies for our code using Conda. You may need to adjust the environment YAML file depending on your setup.
+1. Install the dependencies for our code using Conda. You may need to adjust the environment YAML file depending on your setup.
 
     ```
     conda env create -f environment.yaml
     ```
-3. Launch your environment with `conda activate LADS` or `source activate LADS`
+2. Launch your environment with `conda activate LADS` or `source activate LADS`
 
-4. Fix any misc bugs that you find :p
+3. Compute and store CLIP embeddings for each dataset (see below)
+
+4. Run one of the config files and be amazed (or midly impressed) by what LADS can do
 
 ## Code Structure 
 The configurations for each method are in the `configs` folder. To try say the baseline of doing normal LR on the CLIP embeddings:

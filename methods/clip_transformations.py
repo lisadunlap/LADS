@@ -597,10 +597,9 @@ class ClipMLP(Noop):
             "epoch": epoch,
             "net": self.net.state_dict()
         }
-        try: 
-            os.mkdir("./checkpoint")
-        except: 
-            pass 
+        checkpoint_dir = '/'.join(f'./checkpoint/{self.CFG.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}'.split('/')[:-1])
+        if not os.path.exists(checkpoint_dir):
+            os.makedirs(checkpoint_dir)
         if last:
             torch.save(state, f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth')
             wandb.save(f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth')

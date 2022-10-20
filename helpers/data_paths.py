@@ -43,7 +43,7 @@ BIASED_DATASET_PATHS = {
                 },
         "ViT-L/14": {
                 "CUB": "data/CUB/vit14_clip.pth",
-                "DomainNetMini": "data/DomainNetMini/vit14_clip.pth",
+                "DomainNetMini": "data/DomainNetMini/save.pth",
                 "MNIST_SVHN": "data/SVHN/vit14_clip.pth",
                 "Waterbirds": "data/waterbirds/vit14_clip.pth",
                 "ColoredMNISTBinary": "data/ColoredMNIST/binary_vit14.pth"

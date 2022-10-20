@@ -48,6 +48,7 @@ cfg       = OmegaConf.load(flags.config)
 base      = OmegaConf.load('configs/Noop.yaml')
 args      = OmegaConf.merge(base, cfg, overrides)
 if len(unknown) > 0:
+    print(unknown)
     config = nest_dict(read_unknowns(unknown))
     to_merge = OmegaConf.create(config)
     args = OmegaConf.merge(args, to_merge)

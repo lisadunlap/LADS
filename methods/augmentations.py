@@ -18,6 +18,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn.decomposition import PCA
 from scipy import stats
 import uuid
+import os 
 try:
     from progress_bar import progress_bar
 except:
@@ -578,7 +579,11 @@ class Directional(Augment):
         return list(np.array(output))
 
     def save_checkpoint(self, acc, epoch, num_net):
-        path = f'./checkpoint/{self.prompts[num_net]}-{self.cfg.EXP.SEED}-{self.uid}.pth'
+        try: 
+            path = os.path.join("./checkpoint", self.cfg.DATA.DATASET)
+            os.mkdir(path)
+        except: pass
+        path = f'./checkpoint/{self.cfg.DATA.DATASET}/{self.prompts[num_net]}-{self.cfg.EXP.SEED}-{self.uid}.pth'
         print(f'Saving checkpoint with acc {acc} to {path}...')
         state = {
             "acc": acc,

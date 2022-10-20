@@ -569,13 +569,13 @@ class ClipMLP(Noop):
             self.save_checkpoint(balanced_acc, epoch)
     
     def eval(self, inputs, ret_probs=False):
-        """ Farward pass for classification. if probs=True, return the softmax prob (for ensambling) """
+        """ Forward pass for classification. if probs=True, return the softmax prob (for ensambling) """
         try:
-            ckpt = f"./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth"
+            ckpt = f"./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth"
             print(f"loading checkpoint {ckpt}...")
             self.load_checkpoint(ckpt)
         except:
-            ckpt = f"./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth"
+            ckpt = f"./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth"
             print(f"loading checkpoint {ckpt}...")
             self.load_checkpoint(ckpt)
         generator = chunks(torch.tensor(inputs).cuda().float(), self.cfg.DATA.BATCH_SIZE)
@@ -606,9 +606,6 @@ class ClipMLP(Noop):
             wandb.save(f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth')
         else:
             # make checkpoint directory and DomainNetMini directory
-            print('================')
-            print(self.cfg.METHOD.MODEL.CHECKPOINT_NAME)
-            print('================')
             torch.save(state, f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth')
             wandb.save(f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth')
 

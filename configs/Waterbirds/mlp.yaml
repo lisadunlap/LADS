@@ -1,14 +1,16 @@
 EXP:
   ADVICE_METHOD: "ClipMLP"
   WANDB_SILENT: False
-  PROJ: "Waterbirds"
+  PROJ: "Waterbirds_ViT14"
   SEED: 0
-  TEXT_PROMPTS: ['a photo of a {} on land.', 'a photo of a {} on water.']
+  TEXT_PROMPTS: ['a photo of a {} on forest.', 'a photo of a {} on water.']
   NEUTRAL_TEXT_PROMPTS: ['a photo of a {}.']
   EPOCHS: 200
 
 DATA:
   DATASET: "Waterbirds"
+  BATCH_SIZE: 256
+  LOAD_CACHED: True
 
 METHOD:
   MODEL:

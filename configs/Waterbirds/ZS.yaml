@@ -1,14 +1,15 @@
 EXP:
   ADVICE_METHOD: "CLIPZS"
   WANDB_SILENT: False
-  PROJ: "Waterbirds"
+  PROJ: "Waterbirds_ViT14"
   SEED: 0
   TEXT_PROMPTS: ['landbird', 'waterbird']
-  TEMPLATES: 'waterbirds_templates'
+  # TEMPLATES: 'no_template'
+  TEMPLATES: 'waterbirds_templates2'
   
 DATA:
   DATASET: "Waterbirds"
-  BATCH_SIZE: 32
+  BATCH_SIZE: 256
   LOAD_CACHED: True
   UPWEIGHT_CLASSES: True
 

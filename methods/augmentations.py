@@ -63,6 +63,7 @@ class Augment:
                 assert len(dom_idx) == 1, "error indexing domains, make sure your text prompt contains the name of the domain"
                 self.domain_indexes.append(dom_idx[0])
             else:
+                self.domain_names = self.cfg.AUGMENTATION.DOM_LABELS
                 self.domain_indexes = [self.domain_names.index(p) for p in list(self.cfg.AUGMENTATION.DOM_LABELS)]
         print("domain indexes ", self.domain_indexes)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

@@ -571,7 +571,7 @@ class ClipMLP(Noop):
     def eval(self, inputs, ret_probs=False):
         """ Forward pass for classification. if probs=True, return the softmax prob (for ensambling) """
         try:
-            ckpt = f"./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth"
+            ckpt = f"./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth"
             print(f"loading checkpoint {ckpt}...")
             self.load_checkpoint(ckpt)
         except:
@@ -591,22 +591,22 @@ class ClipMLP(Noop):
         return preds, np.concatenate(probs, axis=0)
 
     def save_checkpoint(self, acc, epoch, last=False):
-        print(f'Saving checkpoint with acc {acc} to ./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth...')
+        print(f'Saving checkpoint with acc {acc} to ./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth...')
         state = {
             "acc": acc,
             "epoch": epoch,
             "net": self.net.state_dict()
         }
-        checkpoint_dir = '/'.join(f'./checkpoint/{self.CFG.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}'.split('/')[:-1])
+        checkpoint_dir = '/'.join(f'./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}'.split('/')[:-1])
         if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
         if last:
-            torch.save(state, f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth')
+            torch.save(state, f'./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth')
             wandb.save(f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth')
         else:
             # make checkpoint directory and DomainNetMini directory
-            torch.save(state, f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth')
-            wandb.save(f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth')
+            torch.save(state, f'./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth')
+            wandb.save(f'./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth')
 
 class DirectionLoss(torch.nn.Module):
     """
@@ -952,7 +952,7 @@ class AugE2EMLPMulti(ClipMLP):
         and changes the domain (rn only works with 1 domain) to be used in the nearest neighbor
         ablations. 
         """
-        ckpt = f"./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth"
+        ckpt = f"./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth"
         print(f"loading checkpoint {ckpt}...")
         self.load_checkpoint(ckpt)
         print("domain indices", self.domain_indexes)
@@ -1250,7 +1250,7 @@ class AugE2EBiasMLP(AugE2EMLPMulti):
         and changes the domain (rn only works with 1 domain) to be used in the nearest neighbor
         ablations. 
         """
-        ckpt = f"./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth"
+        ckpt = f"./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth"
         print(f"loading checkpoint {ckpt}...")
         self.load_checkpoint(ckpt)
         print("domain indices", self.domain_indexes, self.domain_names)
@@ -1479,7 +1479,7 @@ class MLPDebias(ClipMLP):
 
     def eval(self, inputs):
         """ Farward pass for classification """
-        ckpt = f"./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}.pth"
+        ckpt = f"./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}.pth"
         print(f"loading checkpoint {ckpt}...")
         generator = chunks(torch.tensor(inputs).cuda().float(), self.cfg.DATA.BATCH_SIZE)
         preds = np.array([])

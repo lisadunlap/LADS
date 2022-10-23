@@ -55,7 +55,7 @@ def flatten_config(dic, running_key=None, flattened_dict={}):
             flattened_dict[running_key_temp] = value
     return flattened_dict
 
-run = wandb.init(project=args.EXP.PROJ, group=args.EXP.ADVICE_METHOD, config=flatten_config(args))
+run = wandb.init(project=args.EXP.PROJ, group=args.EXP.ADVICE_METHOD, config=flatten_config(args), entity="clipinvariance")
 wandb.save(flags.config)
 wandb.run.log_code(".")
 

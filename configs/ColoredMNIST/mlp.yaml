@@ -1,24 +1,30 @@
 EXP:
   ADVICE_METHOD: "ClipMLP"
   WANDB_SILENT: False
-  PROJ: "BiasDirectional_E2E"
+  PROJ: "ColoredMNIST_ViT_Final"
   SEED: 0
   TEXT_PROMPTS: ['a photo of a red number "{}".', 'a photo of a blue number "{}".']
   NEUTRAL_TEXT_PROMPTS: ['a photo of a white number "{}".']
   EPOCHS: 200
   CHECKPOINT_VAL: True
   GENERIC: False
-  LOG_HIST: True
+  LOG_HIST: False
+
+  # CLIP_MODEL: 'ViT-H-14'
+  # CLIP_PRETRAINED_DATASET: 'laion2b_s32b_b79k'
+  # IMAGE_FEATURES: 'openclip'
 
 DATA:
   DATASET: "ColoredMNISTBinary"
+  LOAD_CACHED: True
+  BATCH_SIZE: 256
 
 METHOD:
   MODEL:
     NUM_LAYERS: 1
     DOM_WEIGHT: 1.0
-    LR: 0.001
-    WEIGHT_DECAY: 0.05
+    LR: 0.005
+    WEIGHT_DECAY: 0.005
     CHECKPOINT: 'checkpoint/mlp_simple.pth'
     RESUME: False
   USE_DOM_GT: True

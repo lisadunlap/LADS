@@ -8,7 +8,7 @@ EXP:
   EPOCHS: 200
   CHECKPOINT_VAL: True
   GENERIC: False
-  LOG_HIST: False
+  LOG_HIST: True
 
   # CLIP_MODEL: 'ViT-H-14'
   # CLIP_PRETRAINED_DATASET: 'laion2b_s32b_b79k'

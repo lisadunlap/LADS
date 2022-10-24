@@ -6,7 +6,7 @@ EXP:
   TEXT_PROMPTS: [['a photo of a red number.'], ['a photo of a blue number.']]
   AUGMENTATION: 'BiasDirectional'
   EPOCHS: 200
-  LOG_HIST: False
+  LOG_HIST: True
   CHECKPOINT_VAL: True
   ENSAMBLE: False
 

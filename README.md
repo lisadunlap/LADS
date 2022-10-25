@@ -25,6 +25,11 @@ Official Implementation of LADS (Latent Augmentation using Domain descriptionS)
 
 4. Run one of the config files and be amazed (or midly impressed) by what LADS can do
 
+## Checkpoints
+The main results and checkpoints of LADS and other baselines can be accessed on wandb.  
+* Waterbirds: https://wandb.ai/clipinvariance/LADS_Waterbirds_Replication
+* ColoredMNIST: https://wandb.ai/clipinvariance/LADS_ColoredMNIST_Replication
+
 ## Code Structure 
 The configurations for each method are in the `configs` folder. To try say the baseline of doing normal LR on the CLIP embeddings:
 ```

@@ -160,7 +160,7 @@ if args.DATA.LOAD_CACHED ==  False:
         "test_filenames": test_filenames
     }
     data_dir = '/'.join(args.DATA.SAVE_PATH.split('/')[:-1])
-    if not os.path.exists(args.DATA.SAVE_PATH):
+    if not os.path.exists(data_dir):
         os.makedirs(data_dir)
     torch.save(data, args.DATA.SAVE_PATH)
     if args.METHOD.NORMALIZE:

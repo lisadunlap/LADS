@@ -1,23 +1,23 @@
 EXP:
   ADVICE_METHOD: "ClipMLP"
   WANDB_SILENT: False
-  PROJ: "BiasDirectional"
+  PROJ: "ColoredMNIST_ViT_Final"
   SEED: 0
-  # TEXT_PROMPTS: [["clipart"], ["painting"], ["real photo"]]
-  # TEXT_PROMPTS: [['painting']]
-  # TEXT_PROMPTS: ['a photo of a red number "{}".', 'a photo of a green number "{}".']
   TEXT_PROMPTS: [['a photo of a red number.'], ['a photo of a blue number.']]
-  # TEXT_PROMPTS: ['a photo of a red number "{}".', 'a photo of a blue number "{}".']
-  # NEUTRAL_TEXT_PROMPTS: [['a photo of a number.']]
   AUGMENTATION: 'BiasDirectional'
   EPOCHS: 200
   LOG_HIST: True
   CHECKPOINT_VAL: True
-  
-  
+  ENSAMBLE: False
+
+  # CLIP_MODEL: 'ViT-H-14'
+  # CLIP_PRETRAINED_DATASET: 'laion2b_s32b_b79k'
+  # IMAGE_FEATURES: 'openclip'
+
 DATA:
   DATASET: "ColoredMNISTBinary"
   LOAD_CACHED: True
+  BATCH_SIZE: 256
 
 METHOD:
   MODEL:
@@ -28,10 +28,18 @@ METHOD:
     CHECKPOINT: 'checkpoint/mlp_simple.pth'
     CHECKPOINT_NAME: 'DomainNetMini/mlp-directional'
     RESUME: False
+    HIDDEN_DIM: 512
   USE_DOM_GT: False
 
 AUGMENTATION:
+  MODEL:
+    HIDDEN_DIM: 512
+  ALPHA: 1
   EPOCHS: 50
   GENERIC: True
   DOM_SPECIFIC_XE: False
-  DOM_LABELS: ["red", "blue"]
+  CLIP_NN_LOSS: True
+  NN_WEIGHT: 0.1
+  DOM_WEIGHT: 10
+  REG_WEIGHT: 0.1
+  CYCLE_GAN_WEIGHT: 0

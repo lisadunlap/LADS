@@ -1,14 +1,10 @@
 EXP:
   ADVICE_METHOD: "ClipMLP"
   WANDB_SILENT: False
-  PROJ: "CUB_Painting"
+  PROJ: "LADS_Replication"
   SEED: 0
-  # TEXT_PROMPTS: [["clipart"], ["painting"], ["real photo"]]
-  # TEXT_PROMPTS: [['a painting of a bird']]
   TEXT_PROMPTS: ['a painting of a {} bird.']
-  # TEXT_PROMPTS: ['an anime drawing of a {} bird.']
   NEUTRAL_TEXT_PROMPTS: ['a photo of a {} bird.']
-  # NEUTRAL_TEXT_PROMPTS: [['a photo of a bird']]
   AUGMENTATION: 'Directional'
   EPOCHS: 200
   LOG_HIST: True
@@ -26,8 +22,7 @@ METHOD:
     DOM_WEIGHT: 1.0
     LR: 0.001
     WEIGHT_DECAY: 0.05
-    CHECKPOINT: 'checkpoint/mlp_simple.pth'
-    CHECKPOINT_NAME: 'CUB/mlp-directional'
+    CHECKPOINT_NAME: 'lads'
     RESUME: False
   USE_DOM_GT: True
 

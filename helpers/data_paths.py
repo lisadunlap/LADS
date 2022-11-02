@@ -1,18 +1,4 @@
 DATASET_PATHS = {
-    "ViT-B/32": {
-                "Waterbirds": 'data/waterbirds/wb_100_vit.pth',
-                "Waterbirds95": 'data/waterbirds/clip_embeddings_95.pth',
-                "Planes": 'data/planes/clip_embeddings_bias_A.pth',
-                "ColoredMNIST": 'data/ColoredMNIST/clip_embeddings.pth',
-                "CatsDogs": 'data/CatsDogs/bright_dogs_dark_cats.pth',
-                "PlanesExt": 'data/planes/planes_ext_vit.pth',
-                "MNIST": "data/ColoredMNIST/mnist.pth",
-                "Imagenet": "data/Imagenet/emb.pth",
-                "Imagenet-a": "data/Imagenet/imagenet_a.pth"
-                },
-}
-
-BIASED_DATASET_PATHS = {
     "clip":{
         "ViT-B/32": {
                 "Waterbirds": 'data/waterbirds/wb_100_vit_bval.pth',
@@ -42,15 +28,12 @@ BIASED_DATASET_PATHS = {
                 "MNIST_SVHN": "data/SVHN/mnist_svhn_rn50.pth"
                 },
         "ViT-L/14": {
-                "CUB": "data/CUB/vit14_clip.pth",
+                "CUB": "data/cub/vit14_clip.pth",
                 "DomainNetMini": "data/DomainNetMini/save.pth",
                 "MNIST_SVHN": "data/SVHN/vit14_clip.pth",
                 "Waterbirds": "data/waterbirds/vit14_clip.pth",
                 "ColoredMNISTBinary": "data/ColoredMNIST/binary_vit14.pth"
                 },
-        "resnet50": {
-                "Waterbirds": 'data/waterbirds/resnet_waterbirds.pth',
-        }
     },
     "openclip":{
         "ViT-H-14": {

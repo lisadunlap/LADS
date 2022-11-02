@@ -580,10 +580,9 @@ class Directional(Augment):
         return list(np.array(output))
 
     def save_checkpoint(self, acc, epoch, num_net):
-        try: 
-            path = os.path.join("./checkpoint", self.cfg.DATA.DATASET)
-            os.mkdir(path)
-        except: pass
+        checkpoint_dir = os.path.join("./checkpoint", self.cfg.DATA.DATASET)
+        if not os.path.exists(checkpoint_dir):
+            os.makedirs(checkpoint_dir)
         path = f'./checkpoint/{self.cfg.DATA.DATASET}/{self.prompts[num_net]}-{self.cfg.EXP.SEED}-{self.uid}.pth'
         print(f'Saving checkpoint with acc {acc} to {path}...')
         state = {

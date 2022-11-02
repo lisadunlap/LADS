@@ -17,7 +17,7 @@ from datasets.domain_net import DomainNet, DOMAINNET_CLASSES, MINI_DOMAINNET_CLA
 from datasets.cub import Cub2011Painting, Cub2011, CUB_DOMAINS, CUB_CLASSES
 
 from helpers.text_templates import imagenet_classes
-from helpers.data_paths import DATASET_PATHS, BIASED_DATASET_PATHS
+from helpers.data_paths import DATASET_PATHS
 
 def get_config(name="Waterbirds"):
     base_cfg  = OmegaConf.load('configs/base.yaml')
@@ -204,9 +204,5 @@ def get_class(dataset_name):
     return DATASET_CLASSES[dataset_name]
 
 def get_cache_file(dataset_name, model_name='ViT-B/32', biased_val=True, model_type='clip'):
-    if biased_val:
-        assert dataset_name in BIASED_DATASET_PATHS[model_type][model_name].keys(), f"{dataset_name} is not cached or not added to the DATASET_PATHS dict in helpers/dataset_helpers.py"
-        return BIASED_DATASET_PATHS[model_type][model_name][dataset_name], DATASET_CLASSES[dataset_name], DATASET_DOMAINS[dataset_name]
-    else:
-        assert dataset_name in DATASET_PATHS[model_name].keys(), f"{dataset_name} is not cached or not added to the DATASET_PATHS dict in helpers/dataset_helpers.py"
-        return DATASET_PATHS[model_name][dataset_name], DATASET_CLASSES[dataset_name], DATASET_DOMAINS[dataset_name]
+    assert dataset_name in DATASET_PATHS[model_type][model_name].keys(), f"{dataset_name} is not cached or not added to the DATASET_PATHS dict in helpers/dataset_helpers.py"
+    return DATASET_PATHS[model_type][model_name][dataset_name], DATASET_CLASSES[dataset_name], DATASET_DOMAINS[dataset_name]

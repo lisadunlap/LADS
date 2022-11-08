@@ -36,6 +36,10 @@ from omegaconf import OmegaConf
 import omegaconf
 import ast
 
+# from dalle2_laion import ModelLoadConfig, DalleModelManager
+# from dalle2_laion.scripts import InferenceScript
+# from test import ExampleInference
+
 parser = argparse.ArgumentParser(description='CLIP Advice')
 parser.add_argument('--config', default='configs/Noop.yaml', help="config file")
 parser.add_argument('overrides', nargs='*', help="Any key=value arguments to override config values "
@@ -221,6 +225,14 @@ if args.EXP.LOG_HIST:
             except:
                 print(f"sample idx {sample_idx} is not a valid index")
         wandb.log({"train features NN": wandb.Image(f), "domain consistency acc": domain_acc, "class consistency acc": class_acc, "unique nn": prop_unique})
+
+        sample_idxs = random.sample(list(range(len(train_features))), 10)
+        with open('dalle/embeddings.npy', 'wb') as f:
+            for i in sample_idxs:
+                np.save(f, train_features[i])
+                np.save(f, train_features[i+1])
+                print(f"original domain: {train_domains[i]}, augmented domain: {train_domains[i+1]}")
+
         wandb.sklearn.plot_confusion_matrix(sample_domains, neighbor_domains, dataset_domains)
         if args.EXP.LOG_EMB_DRIFT:
             sample_idxs = random.sample(list(range(len(val_features))), min([len(val_features), 1000]))

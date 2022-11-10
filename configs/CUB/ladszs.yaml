@@ -1,14 +1,14 @@
 EXP:
-  ADVICE_METHOD: "ClipMLP"
+  ADVICE_METHOD: "ClipMLPZS"
   WANDB_SILENT: False
   PROJ: "LADS_Replication"
   SEED: 0
   TEXT_PROMPTS: ['a painting of a {} bird.']
   NEUTRAL_TEXT_PROMPTS: ['a photo of a {} bird.']
   AUGMENTATION: 'Directional'
-  EPOCHS: 200
-  LOG_HIST: True
+  EPOCHS: 400
   ENSAMBLE: True
+  TEMPLATE: 'cub_template'
   
   
 DATA:
@@ -28,8 +28,9 @@ METHOD:
 
 AUGMENTATION:
   MODEL:
-    LR: 0.1
+    LR: 0.001
     WEIGHT_DECAY: 0.05
     NUM_LAYERS: 1
   GENERIC: False
   DOM_LABELS: ['painting']
+  EPOCHS: 200

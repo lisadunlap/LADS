@@ -1,15 +1,16 @@
 EXP:
-  ADVICE_METHOD: "ClipMLP"
+  ADVICE_METHOD: "ClipMLPZS"
   WANDB_SILENT: False
-  PROJ: "LADS_Replication"
+  PROJ: "DomainNetMini_LADS_Replication"
   SEED: 0
   TEXT_PROMPTS: ['a painting of a {} bird.']
   NEUTRAL_TEXT_PROMPTS: ['a photo of a {} bird.']
   EPOCHS: 400
   CHECKPOINT_VAL: True
+  TEMPLATES: 'domainnet_mini_templates'
 
 DATA:
-  DATASET: "CUB"
+  DATASET: "DomainNetMini"
   BATCH_SIZE: 256
 
 METHOD:

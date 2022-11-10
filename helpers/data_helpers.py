@@ -15,22 +15,17 @@ from datasets.waterbirds import Waterbirds, WaterbirdsBoring, WaterbirdsSimple, 
 from datasets.colored_mnist import ColoredMNIST, ColoredMNISTSimplified, MNIST, SVHN
 from datasets.domain_net import DomainNet, DOMAINNET_CLASSES, MINI_DOMAINNET_CLASSES, MINI_DOMAINS, OneDomain, MultiDomain, DomainNetMiniAug
 from datasets.cub import Cub2011Painting, Cub2011, CUB_DOMAINS, CUB_CLASSES
+from datasets.office_home import OfficeHome, OFFICE_HOME_CLASSES, OFFICE_HOME_DOMAINS
+from datasets.grozi import Products, GROZI_CLASSES, GROZI_DOMAINS
 
-from helpers.text_templates import imagenet_classes
 from helpers.data_paths import DATASET_PATHS
 
 def get_config(name="Waterbirds"):
-    base_cfg  = OmegaConf.load('configs/base.yaml')
+    base_cfg  = OmegaConf.load('data_configs/base.yaml')
     if name == "Waterbirds":
-        cfg       = OmegaConf.load('configs/waterbirds.yaml')
-    elif name == "WaterbirdsTiny":
-        cfg       = OmegaConf.load('configs/waterbirds_tiny.yaml')
-    elif name == "Waterbirds95":
-        cfg       = OmegaConf.load('configs/waterbirds_95.yaml')
-    elif name == "PlanesExt":
-         cfg       = OmegaConf.load('configs/planes_ext.yaml')
+        cfg       = OmegaConf.load('data_configs/waterbirds.yaml')
     elif "ColoredMNIST" in name:
-        cfg       = OmegaConf.load('configs/colored_mnist.yaml')
+        cfg       = OmegaConf.load('data_configs/colored_mnist.yaml')
     else:
         raise ValueError(f"{name} Dataset config not found")
     args      = OmegaConf.merge(base_cfg, cfg)
@@ -122,20 +117,6 @@ def get_dataset(dataset_name, transform, val_transform=None, biased_val=True):
         trainset = MNIST('./data', args, transform=transform, biased_val=biased_val)
         valset = MNIST('./data', args, split='test', transform=val_transform, biased_val=biased_val)
         testset = SVHN('./data', args, split='test', transform=val_transform, biased_val=biased_val)
-    elif dataset_name == 'ColoredMNISTQuinque':
-        args = get_config('ColoredMNIST')
-        args.DATA.BIAS_TYPE = 'quinque'
-        args.DATA.CONFOUNDING = 1.0
-        trainset = ColoredMNISTSimplified('./data', args, transform=transform, biased_val=biased_val)
-        valset = ColoredMNISTSimplified('./data', args, split='val', transform=val_transform, biased_val=biased_val)
-        testset = ColoredMNISTSimplified('./data', args, split='test', transform=val_transform, biased_val=biased_val)
-    elif dataset_name == 'ColoredMNISTQuinque95':
-        args = get_config('ColoredMNIST')
-        args.DATA.BIAS_TYPE = 'quinque'
-        args.DATA.CONFOUNDING = 0.95
-        trainset = ColoredMNISTSimplified('./data', args, transform=transform, biased_val=biased_val)
-        valset = ColoredMNISTSimplified('./data', args, split='val', transform=val_transform, biased_val=biased_val)
-        testset = ColoredMNISTSimplified('./data', args, split='test', transform=val_transform, biased_val=biased_val)
     elif dataset_name == "DomainNet":
         cfg = get_config('DomainNet')
         trainset = DomainNet('/shared/lisabdunlap/data', cfg, split='train', transform=transform)
@@ -161,6 +142,14 @@ def get_dataset(dataset_name, transform, val_transform=None, biased_val=True):
         trainset = Cub2011('/shared/lisabdunlap/data', train=True, transform=transform)
         valset = Cub2011('/shared/lisabdunlap/data', train=False, transform=val_transform)
         testset = Cub2011Painting('/shared/lisabdunlap/data/CUB-200-Painting', transform=val_transform)
+    elif dataset_name == "GroZi":
+        trainset = Products(split='train', transform=transform)
+        valset = Products(split='val', transform=val_transform)
+        testset = Products(split='test', transform=val_transform)
+    elif dataset_name == "OfficeHomeProduct":
+        trainset = OfficeHome('/shared/lisabdunlap/data', domains=["Product"], train=True, transform=transform)
+        valset = OfficeHome('/shared/lisabdunlap/data', domains=["Product"], train=False, transform=transform)
+        testset = OfficeHome('/shared/lisabdunlap/data', domains=["Art", "Clipart", "Real World"],train=True, transform=transform)
     else:
         raise ValueError(f"{dataset_name} Dataset not supported")
 
@@ -181,6 +170,8 @@ DATASET_CLASSES = {
     "DomainNetMiniAug": MINI_DOMAINNET_CLASSES,
     "DomainNetMiniOracle": MINI_DOMAINNET_CLASSES,
     "CUB": CUB_CLASSES,
+    "OfficeHomeProduct": OFFICE_HOME_CLASSES,
+    "GroZi": GROZI_CLASSES,
 }
 
 DATASET_DOMAINS = {
@@ -194,7 +185,9 @@ DATASET_DOMAINS = {
     "DomainNetMiniOracle": MINI_DOMAINS,
     "CUB": CUB_DOMAINS,
     "SVHN": ["MNIST", "SVHN"],
-    "MNIST_SVHN": ["MNIST", "SVHN"]
+    "MNIST_SVHN": ["MNIST", "SVHN"],
+    "OfficeHomeProduct": OFFICE_HOME_DOMAINS,
+    "GroZi": GROZI_DOMAINS,
 }
 
 def get_domain(dataset_name):

@@ -1,19 +1,15 @@
 EXP:
   ADVICE_METHOD: "CLIPZS"
   WANDB_SILENT: False
-  PROJ: "CUB_Painting"
+  PROJ: "LADS_Replication"
   SEED: 0
-  TEXT_PROMPTS: ["a photo of a {}"]
   TEMPLATES: 'cub_template'
+  # uncomment this if you want to run ZS (G)
+  # TEMPLATES: 'no_template'
   
 DATA:
   DATASET: "CUB"
   BATCH_SIZE: 32
-  SAVE_PATH: "data/CUB/save.pth"
-
-METHOD:
-  MODEL:
-    NUM_LAYERS: 1
-    SEPERATE_CLASSES: True
-    RESUME: True
-  NORMALIZE: False
+  # uncomment if you need to compute the clip embeddings
+  # SAVE_PATH: "data/cub/vit_14.pth"
+  # LOAD_CACHED: False

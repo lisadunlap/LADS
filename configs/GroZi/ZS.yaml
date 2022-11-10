@@ -1,17 +1,16 @@
 EXP:
   ADVICE_METHOD: "CLIPZS"
   WANDB_SILENT: False
-  PROJ: "DomainNetMini_LADS_Replication"
+  PROJ: "LADS_GroZi"
   SEED: 0
-  TEXT_PROMPTS: []
-  TEMPLATES: 'domainnet_mini_templates'
+  TEMPLATES: 'no_template'
+  LOG_HIST: False
   
 DATA:
-  DATASET: "DomainNetMini"
+  DATASET: "GroZi"
   BATCH_SIZE: 64
-  LOAD_CACHED: False
+  LOAD_CACHED: True
   UPWEIGHT_CLASSES: True
-  SAVE_PATH: "data/DomainNetMini/save.pth"
 
 METHOD:
   MODEL:

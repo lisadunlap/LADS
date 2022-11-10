@@ -30,7 +30,7 @@ flags, unknown = parser.parse_known_args()
 
 overrides = OmegaConf.from_cli(flags.overrides)
 cfg       = OmegaConf.load(flags.config)
-base      = OmegaConf.load('configs/Noop.yaml')
+base      = OmegaConf.load('configs/base.yaml')
 args      = OmegaConf.merge(base, cfg, overrides)
 if len(unknown) > 0:
     config = nest_dict(read_unknowns(unknown))
@@ -91,9 +91,6 @@ elif IMAGE_FEATURES == 'openclip':
     model, _, preprocess = open_clip.create_model_and_transforms(args.EXP.CLIP_MODEL, pretrained=args.EXP.CLIP_PRETRAINED_DATASET)
     model = model.to(device)
 model.eval()
-# Calculate the image features
-prompts = list(args.EXP.TEXT_PROMPTS)
-assert type(prompts[0]) == str, "CLIP ZS only takes one word per class"
 
 if args.DATA.LOAD_CACHED ==  False:
     trainset, valset, testset = dh.get_dataset(DATASET_NAME, preprocess, biased_val=args.EXP.BIASED_VAL)
@@ -124,7 +121,7 @@ if args.DATA.LOAD_CACHED ==  False:
     }
     data_dir = '/'.join(args.DATA.SAVE_PATH.split('/')[:-1])
 
-    if not os.path.exists(data_dir): os.makedir(data_dir)
+    if not os.path.exists(data_dir): os.makedirs(data_dir)
 
     torch.save(data, args.DATA.SAVE_PATH)
 
@@ -153,7 +150,7 @@ def zeroshot_classifier(classnames, templates):
             zeroshot_weights.append(class_embedding)
         zeroshot_weights = torch.stack(zeroshot_weights, dim=1).cuda()
     return zeroshot_weights
-
+print("TEMPLATES", getattr(helpers.text_templates, args.EXP.TEMPLATES))
 zeroshot_weights = zeroshot_classifier(dataset_classes, getattr(helpers.text_templates, args.EXP.TEMPLATES))
 
 def eval(loader):
@@ -190,7 +187,7 @@ preds, labels, groups = eval(test_loader)
 accuracy, balanced_acc, class_accuracy, group_accuracy = CLIPTransformations.evaluate(preds, labels, groups)
 # group_acc = group_accuracy.reshape(len(dataset_classes), max([int(len(group_accuracy)/len(dataset_classes)), 1]))
 _, _, _, domain_accuracy = CLIPTransformations.evaluate(preds, test_labels, np.squeeze(test_domains), list(range(len(dataset_classes))))
-
+print(f"unique test domains {np.unique(test_domains)}")
 wandb.summary["test acc"] = accuracy
 wandb.summary["test blanced acc"] = balanced_acc
 wandb.summary["test class acc"] = class_accuracy

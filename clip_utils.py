@@ -174,6 +174,7 @@ def get_per_group_acc(value, predictions, labels, groups):
     return np.mean((labels[indices] == predictions[indices]).astype(np.float)) * 100.
 
 def zeroshot_classifier(prompts, model, normalize=True, model_type='clip', cuda_device='0'):
+    """ Computes CLIP text embeddings for a list of prompts. """
     model.eval()
     assert type(prompts[0]) == list, "prompts must be a list of lists"
     with torch.no_grad():
@@ -286,23 +287,21 @@ def get_clip_emb_drift(aug_set, aug_domains, sample_set, sample_domains, num_dom
         return metrics
 
 
-def get_ensamble_preds(val_features, model, zeroshot_weights, model_type='LR', dataset_domains=None):
+def get_ensamble_preds(val_features, probs, zeroshot_weights, dataset_domains=None):
     """
     Take in the clip image mebeddings, classfier, and clip ZS text embeddings, 
     averages the probabilites, and returns the predictions
     """
+    print("ENSAMBLE PREDS", probs[0].shape)
     if dataset_domains is not None:
         soft_dom_label = np.matmul(val_features, dataset_domains.cpu().numpy())
         soft_dom_label = soft_dom_label.argmax(axis=1)
 
-    if model_type == 'LR':
-        outputs = model.predict_proba(val_features)
-    else:
-        # hacky: for MLP, model=output probs
-        try:
-            outputs = model.cpu().numpy()
-        except:
-            outputs = model
+    # hacky: for MLP, model=output probs
+    try:
+        outputs = probs.cpu().numpy()
+    except:
+        outputs = probs
     print(outputs.shape)
     salem_preds = np.argmax(outputs, axis=1)
     print(salem_preds.shape)

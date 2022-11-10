@@ -1,13 +1,12 @@
 EXP:
   ADVICE_METHOD: "ClipMLP"
   WANDB_SILENT: False
-  PROJ: "Waterbirds_ViT14"
+  PROJ: "LADS_Waterbirds_Rebuttal"
   SEED: 0
   TEXT_PROMPTS: ['a photo of a {} on forest.', 'a photo of a {} on water.']
   NEUTRAL_TEXT_PROMPTS: []
   AUGMENTATION: 'BiasDirectional'
   EPOCHS: 200
-  LOG_HIST: True
   CHECKPOINT_VAL: True
   ENSAMBLE: False
   
@@ -31,12 +30,12 @@ METHOD:
 AUGMENTATION:
   MODEL:
     LR: 0.005
-    WEIGHT_DECAY: 0.05
+    WEIGHT_DECAY: 0.005
     NUM_LAYERS: 1
     HIDDEN_DIM: 512
   EPOCHS: 50
   GENERIC: False
-  DOM_LABELS: ['forest', 'water']
+  DOM_LABELS: ["forest","water"]
   DOM_SPECIFIC_XE: True
   ALPHA: 0.75
   CLIP_NN_LOSS: True

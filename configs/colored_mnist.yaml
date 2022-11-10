@@ -1,7 +1,0 @@
-DATA:
-  DATASET: 'ColoredMNIST'
-  CONFOUNDING: 1.0
-  COLOR_VAR: 0.020
-  BIAS_TYPE: 'quinque'
-  SHRINK: True
-  # BIAS_TYPE: 'binary'

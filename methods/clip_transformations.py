@@ -16,25 +16,21 @@ import numpy as np
 from tqdm import tqdm
 from scipy.spatial import distance
 import pandas as pd
-from transformers import AdamW, get_linear_schedule_with_warmup
-from typing import Tuple, Optional, Union
-from sklearn.metrics import confusion_matrix
+from transformers import AdamW
 import omegaconf
-from sklearn.decomposition import PCA
-from pytorch_revgrad import RevGrad
+from omegaconf import OmegaConf
+
 try:
     from progress_bar import progress_bar
 except:
     progress_bar = lambda current, total, msg: None
 
-from snorkel.classification import cross_entropy_with_probs
 import uuid
 
-from methods.predictors import EmbeddingDebiasModel, MLP, Predictor
-from clip_utils import zeroshot_classifier, projection, gram_schmidt, evaluate
+from methods.predictors import EmbeddingDebiasModel, MLP, Predictor, MPLZS
+from clip_utils import zeroshot_classifier, evaluate
 
-from omegaconf import OmegaConf
-
+import helpers.text_templates
 from helpers.text_templates import imagenet_templates, part_templates, imagenet_templates_small
 from helpers.data_helpers import DATASET_CLASSES, DATASET_DOMAINS
 import helpers
@@ -92,9 +88,7 @@ class Noop:
             else:
                 self.orig_prompts = text_pairs
                 text_diffs = text_pairs
-            print("text diff shape ", np.array(text_diffs).shape) # should be (num_domains, num_classes, emb_size)
-            self.text_embeddings = np.array(text_diffs).transpose((1, 0, 2))
-            print("text diff shape ", self.text_embeddings.shape)
+            self.text_embeddings = np.array(text_diffs).transpose((1, 0, 2)) # should be (num_classes, num_domains, emb_size)
 
     @staticmethod
     def compose_text_with_templates(text: str, templates=imagenet_templates) -> list:
@@ -136,251 +130,6 @@ class Noop:
                     # average across classes
                     dist = 1 - distance.cosine(inputs[i], np.average(self.text_embeddings, axis=0)[j])
                     ret.append([int(labels[i]), self.text_prompts[j], j, dist])
-        return pd.DataFrame(ret[1:], columns=ret[0])
-
-class SubtractEmbeddings(Noop):
-    """
-    Simply subtracts the embeddings of the text prompts (averages the differences in concepts and image embeddings)
-    """
-
-    # def apply(self, inputs):
-    #     inputs = super().apply(inputs)
-    #     ret = []
-    #     for i in range(inputs.shape[0]):
-    #         altered = np.average(np.array([i - t for t in self.text_embeddings]), axis=0)
-    #         ret.append(altered)
-    #     return np.array(ret)
-
-    def apply(self, inputs, labels=None):
-        inputs = super().apply(inputs, labels)
-        ret = []
-        for h in inputs:
-            if not self.cfg.AUGMENTATION.GENERIC:
-                bias_cls = np.argmax((torch.Tensor(h).half() @ self.text_embeddings[:,0].T).float().numpy())
-                b = self.text_embeddings[:,0][bias_cls]
-                b /= np.linalg.norm(b, axis=-1, keepdim=True)
-                proj = (1- self.cfg.METHOD.ALPHA) * h - self.cfg.METHOD.ALPHA * b
-                proj /= np.linalg.norm(proj, axis=-1)
-                ret.append(proj)
-            else:
-                altered = np.average(np.array([(h - t)/np.linalg.norm(h - t, axis=-1) for t in self.text_embeddings]), axis=0)
-                ret.append(altered)
-        return np.array(ret)
-
-class CustomProjection(Noop):
-    """
-    Loads a dict of bias vectors (where the keys are the text prompts) and 
-    applies vector projection to the relevant inputs (aka if we get an input
-    with the highest cosine similarity to "green", we project out of the "green" vector)
-    """
-    def __init__(self, text_prompts, model, cfg, neutral_prompts=[]):
-        # WARNING: prompts should be a list of lists
-        if cfg.AUGMENTATION.GENERIC:
-            assert type(text_prompts[0]) == list
-        else:
-            assert type(text_prompts[0]) == str
-        print("TEXT PROMPTS ", text_prompts)
-        self.cfg = cfg
-        assert 'BIAS_VEC_FILE' in cfg.METHOD, "need a bias vector file"
-        self.text_prompts = text_prompts
-        self.model = model
-        self.bias_dict = torch.load(self.cfg.METHOD.BIAS_VEC_FILE)
-        self.bias_vectors = []
-        print(text_prompts[:-1], list(self.bias_dict.keys()))
-        for prompt in text_prompts[:-1]:
-            flag = False
-            for p in prompt:
-                if p in self.bias_dict:
-                    print("found! ", p)
-                    self.bias_vectors.append(self.bias_dict[p])
-                    flag = True
-            if not flag:
-                raise ValueError("prompt does not appear in keys")
-        print(np.array(self.bias_vectors).shape)
-        # create a vec of zeros for the last class, which is neutral
-        self.bias_vectors.append(torch.zeros_like(self.bias_vectors[0]))
-        self.text_embeddings = zeroshot_classifier(text_prompts, model, model_type=self.cfg.EXP.IMAGE_FEATURES).T
-        b = gram_schmidt(self.text_embeddings.T)
-        self.text_embeddings = b.T
-        print("TEXT EMB SHAPE ", self.text_embeddings.shape)
-
-    def apply(self, inputs, labels=None):
-        inputs = super().apply(inputs, labels)
-        ret = []
-        for h in inputs:
-            bias_cls = np.argmax((torch.Tensor(h).half() @ self.text_embeddings.T).float().numpy())
-            b = self.bias_vectors[bias_cls].numpy()
-            h_v = np.nan_to_num(projection(b, h))
-            proj = h - h_v
-            proj /= np.linalg.norm(proj, axis=-1)
-            ret.append(h - h_v)
-        return np.array(ret)
-
-    def calc_dist(self, inputs, labels):
-        assert len(self.text_prompts) > 0, "text prompts needed"
-        ret = [["label", "text", "text id", "sim"]]
-        if self.cfg.METHOD.NORMALIZE:
-            inputs = self.normalize(inputs)
-        for i in range(inputs.shape[0]):
-            for j in range(len(self.text_prompts)):
-                dist = 1 - distance.cosine(inputs[i], self.text_embeddings[j])
-                ret.append([int(labels[i]), self.text_prompts[j][0], j, dist])
-        return pd.DataFrame(ret[1:], columns=ret[0])
-
-class PCAProjection(Noop):
-    """
-    Loads a dict of bias vectors (where the keys are the text prompts) and 
-    applies vector projection to the relevant inputs (aka if we get an input
-    with the highest cosine similarity to "green", we project out of the "green" vector)
-    """
-    def __init__(self, text_prompts, model, cfg, neutral_prompts=[]):
-        super().__init__(text_prompts, model, cfg, neutral_prompts)
-        pca = PCA(n_components=cfg.METHOD.K, svd_solver='full')
-        pca.fit(self.text_embeddings)
-        self.bias_space = pca.components_
-
-    def apply(self, inputs, labels=None):
-        inputs = super().apply(inputs, labels)
-        ret = []
-        for h in inputs:
-            h_v = np.sum([(np.dot(h, b) / np.dot(b, b)) * b for b in self.bias_space], axis=0)
-            norm_vec  = h - h_v
-            ret.append(self.normalize(norm_vec))
-        return np.array(ret)
-
-class AvgProjection(Noop):
-    """
-    Loads a dict of bias vectors (where the keys are the text prompts) and 
-    applies vector projection to the relevant inputs (aka if we get an input
-    with the highest cosine similarity to "green", we project out of the "green" vector)
-    """
-    def __init__(self, text_prompts, model, cfg, neutral_prompts=[]):
-        super().__init__(text_prompts, model, cfg, neutral_prompts)
-
-    def apply(self, inputs, labels=[]):
-        inputs = super().apply(inputs, labels)
-        ret = []
-        if len(labels) == 0:
-            for h in inputs:
-                h_v = np.sum([(np.dot(h, b) / np.dot(b, b)) * b for b in np.average(self.text_embeddings, axis=0)], axis=0)
-                norm_vec  = (1-self.cfg.METHOD.ALPHA) * h - self.cfg.METHOD.ALPHA * h_v
-                ret.append(self.normalize(norm_vec))
-            return np.array(ret)
-        else:
-            for h, l in zip(inputs, labels):
-                h_v = np.sum([(np.dot(h, b) / np.dot(b, b)) * b for b in self.text_embeddings[int(l)]], axis=0)
-                norm_vec  = (1-self.cfg.METHOD.ALPHA) * h - self.cfg.METHOD.ALPHA * h_v
-                ret.append(self.normalize(norm_vec))
-            return np.array(ret)
-
-class SentenceDebias(Noop):
-
-    def __init__(self, text_prompts, model, cfg, neutral_prompts=[]):
-        # WARNING: prompts should be a list of lists
-        assert type(text_prompts[0]) == list
-        self.prompts = text_prompts
-        self.model = model
-        self.d = len(self.prompts[0])
-        self.embs = []
-        self.bias_vectors = []
-        self.text_embeddings = zeroshot_classifier(text_prompts, model, model_type=cfg.EXP.IMAGE_FEATURES).T
-        print("TEXT EMB SHAPE ", self.text_embeddings.shape)
-        self.cfg = cfg
-        if self.cfg.METHOD.NORMALIZE:
-            self.text_embeddings = self.normalize(self.text_embeddings)
-        pca = PCA(n_components=cfg.METHOD.K, svd_solver='full')
-        pca.fit(self.text_embeddings)
-        self.bias_space = pca.components_
-        print("BIASED EMB SHAPE ", self.bias_space.shape)
-
-    def apply(self, inputs, labels=None):
-        inputs = super().apply(inputs, labels)
-        ret = []
-        for h in inputs:
-            h_v = np.sum([(np.dot(h, b) / np.dot(b, b)) * b for b in self.bias_space], axis=0)
-            ret.append((h - h_v) / np.linalg.norm(h-h_v))
-        return np.array(ret)
-
-    def calc_dist(self, inputs, labels):
-        assert len(self.prompts) > 0, "text prompts needed"
-        ret = [["label", "text", "text id", "sim"]]
-        if self.cfg.METHOD.NORMALIZE:
-            inputs = self.normalize(inputs)
-        for i in range(inputs.shape[0]):
-            for j in range(len(self.prompts)):
-                dist = 1 - distance.cosine(inputs[i], self.text_embeddings[j])
-                ret.append([int(labels[i]), self.prompts[j][0], j, dist])
-        return pd.DataFrame(ret[1:], columns=ret[0])
-
-class HardDebias(Noop):
-
-    def __init__(self, text_prompts, model, cfg, neutral_prompts):
-        # WARNING: prompts should be a list of lists
-        assert type(text_prompts[0]) == list
-        self.text_prompts = text_prompts
-        self.model = model
-        self.d = len(self.text_prompts[0])
-        self.embs = []
-        self.cfg = cfg
-        self.bias_vectors = []
-        self.text_embeddings = zeroshot_classifier(text_prompts, model, model_type=self.cfg.EXP.IMAGE_FEATURES).cpu().numpy()
-        self.text_embeddings = np.transpose(self.text_embeddings, (1,0))
-        biased_sets = self.create_biased_subspace(text_prompts, model, emb_len=self.text_embeddings.shape[-1])
-        pca, diffs = self.doPCA(biased_sets, cfg.METHOD.K)
-        self.text_embeddings = diffs
-        print("text emb shapes", self.text_embeddings.shape)
-        self.bias_space = pca.components_
-        print("BIASED SUBSPACE SHAPE ", self.bias_space.shape, self.text_embeddings.shape[-1])
-
-    @staticmethod
-    def create_biased_subspace(text_prompts, model, emb_len=512):
-        text_emb = np.zeros((len(text_prompts), len(text_prompts[0]), emb_len))
-        with torch.no_grad():
-            for i in range(len(text_prompts)):
-                for j in range(len(text_prompts[i])):
-                    texts = clip.tokenize(text_prompts[i][j]).cuda() #tokenize
-                    class_embeddings = model.encode_text(texts) #embed with text encoder
-                    class_embeddings /= class_embeddings.norm()
-                    text_emb[i][j] = torch.squeeze(class_embeddings).cpu().numpy()
-
-        print("orignal shape", text_emb.shape)
-        # biased_sets = np.transpose(text_emb, (1, 0, 2))
-        return text_emb
-
-    @staticmethod
-    def doPCA(biased_sets, num_components = 10):
-        centers = []
-        for pairs in biased_sets:
-            centers.append(pairs[1]-pairs[0])
-        matrix = np.array(centers)
-        pca = PCA(n_components = num_components)
-        pca.fit(matrix)
-        return pca, matrix
-
-    @staticmethod
-    def project(a, b):
-        return (np.dot(a, b) / np.dot(b, b))*b
-
-    def apply(self, inputs, labels=None):
-        inputs = super().apply(inputs, labels)
-        ret = []
-        for h in inputs:
-            h_v = np.sum([self.project(h, b) for b in self.bias_space], axis=0)
-            orth_h = np.expand_dims(h - h_v, axis=0)
-            orth_h /= np.linalg.norm(orth_h, axis=-1, keepdims=True)
-            ret.append(orth_h[0])
-        return np.array(ret)
-
-    def calc_dist(self, inputs, labels):
-        assert len(self.text_prompts) > 0, "text prompts needed"
-        ret = [["label", "text", "text id", "sim"]]
-        print(self.text_embeddings.shape)
-        if self.cfg.METHOD.NORMALIZE:
-            inputs = self.normalize(inputs)
-        for i in range(inputs.shape[0]):
-            for j in range(len(self.text_prompts)):
-                dist = 1 - distance.cosine(inputs[i], self.text_embeddings[j])
-                ret.append([int(labels[i]), self.text_prompts[j][-1], j, dist])
         return pd.DataFrame(ret[1:], columns=ret[0])
         
 class EmbeddingDataset:
@@ -433,23 +182,6 @@ class EmbeddingDataset:
         #     return self.inputs[idx], self.labels[idx], self.groups[idx], torch.Tensor(soft_label)
         return self.inputs[idx], self.labels[idx], self.groups[idx], self.domain_labels[idx]
 
-class EmbeddingTextDataset(EmbeddingDataset):
-    """
-    Same as EmbeddingDataset but instead of returning the domain label, it returns the text embedding for the domain label.
-    """
-    def __init__(self, cfg, inputs, labels, groups, dom_gt, text_emb=None):
-        super().__init__(cfg, inputs, labels, groups, dom_gt, text_emb)
-        assert len(self.text_emb) == len(np.unique(self.domain_labels)), "text embedding and domain labels don't match"
-
-    def __getitem__(self, idx):
-        inp, label, group, dom_label = super().__getitem__(idx)
-        return inp, label, group, self.text_emb[dom_label]
-
-def chunks(lst, n):
-    """Yield successive n-sized chunks from lst."""
-    for i in range(0, len(lst), n):
-        yield lst[i:i + n]
-
 class ClipMLP(Noop):
 
     def __init__(self, text_prompts, model, cfg, neutral_prompts=[]):
@@ -495,9 +227,9 @@ class ClipMLP(Noop):
         if not self.cfg.METHOD.MODEL.RESUME:
             self.best_acc, self.best_epoch = 0, 0
             for epoch in range(self.cfg.EXP.EPOCHS):
-                self.train(epoch)
+                self.train_val_loop(self.train_loader, epoch, phase="train")
                 if self.cfg.EXP.CHECKPOINT_VAL:
-                    self.test(epoch, load=False)
+                    self.train_val_loop(self.test_loader, epoch, phase="val")
             self.save_checkpoint(0.0, epoch, last=True)
             wandb.summary['best val balanced acc'] = self.best_acc
             wandb.summary['best epoch'] = self.best_epoch
@@ -507,67 +239,54 @@ class ClipMLP(Noop):
         self.net.load_state_dict(checkpoint['net'])
         print(f"...loaded checkpoint with acc {checkpoint['acc']}")
 
-    def train(self, epoch):
-        print(f"Epoch {epoch}")
-        self.net.train()
-        train_cls_loss, train_dom_loss, train_loss, cls_correct, total = 0, 0, 0, 0, 0
-        for i, (inp, cls_target, cls_group, dom_target) in enumerate(self.train_loader):
-            # print(inp, cls_target, cls_group, dom_target)
-            inp, cls_target= inp.cuda().float(), cls_target.cuda().long()
-            self.optimizer.zero_grad()
-            cls_outputs = self.net(inp)
-            cls_loss = self.class_criterion(cls_outputs, cls_target)
-            loss = cls_loss 
-            loss.backward()
-            self.optimizer.step()
+    def predict(self, inp):
+        out = self.net(inp)
+        conf, cls_pred = torch.max(self.m(out), dim=-1)
+        return out, conf, cls_pred
 
-            train_cls_loss += cls_loss.item()
-            train_loss += train_cls_loss + train_dom_loss
-            _, cls_predicted = self.m(cls_outputs).max(1)
-            total += cls_target.size(0)
-            cls_correct += cls_predicted.eq(cls_target).sum().item()
-
-            progress_bar(i, len(self.train_loader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                         % (train_cls_loss/(i+1), 100.*cls_correct/total, cls_correct, total))
-
-        wandb.log({"class loss": train_cls_loss/(i+1), "dom loss": train_dom_loss/(i+1), "train cls acc": 100.*cls_correct/total})
-
-    def test(self, epoch, load=True):
-        ## load best model
-        if load:
-            ckpt = f"./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth"
-            self.load_checkpoint(ckpt)
-        self.net.eval()
-        test_cls_loss, test_dom_loss, cls_correct, total = 0, 0, 0, 0
+    def train_val_loop(self, loader, epoch, phase="train"):
+        """
+        One epoch of train-val loop.
+        Returns of dict of metrics to log
+        """
+        total_loss, cls_correct, total = 0,0,0
+        if phase == "train":
+            self.net.train()
+        else:
+            self.net.eval()
+        total_loss, cls_correct, total = 0, 0, 0
         cls_true, cls_pred, cls_groups, dom_true = np.array([]), np.array([]), np.array([]), np.array([])
-        with torch.no_grad():
-            for i, (inp, cls_target, cls_group, dom_target) in enumerate(self.test_loader):
-
+        with torch.set_grad_enabled(phase == 'train'):
+            for i, (inp, cls_target, cls_group, dom_target) in enumerate(loader):
                 inp, cls_target = inp.cuda().float(), cls_target.cuda().long()
-                cls_outputs = self.net(inp)
-                cls_loss = self.class_criterion(cls_outputs, cls_target)
+                if phase == "train":
+                    self.optimizer.zero_grad()
+                out, conf, cls_predicted = self.predict(inp)
+                cls_loss = self.class_criterion(out.float(), cls_target)
                 loss = cls_loss 
+                if phase == "train":
+                    loss.backward()
+                    self.optimizer.step()
 
-                test_cls_loss += cls_loss.item()
-                _, cls_predicted = self.m(cls_outputs).max(1)
+                total_loss += cls_loss.item()
                 total += cls_target.size(0)
                 cls_correct += cls_predicted.eq(cls_target).sum().item()
-                # this is for creating the confusion matrix
+
                 cls_true = np.append(cls_true, cls_target.cpu().numpy())
                 cls_pred = np.append(cls_pred, cls_predicted.cpu().numpy())
                 cls_groups = np.append(cls_groups, cls_group.cpu().numpy())
                 dom_true = np.append(dom_true, dom_target.cpu().numpy())
-
                 progress_bar(i, len(self.test_loader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                            % (test_cls_loss/(i+1), 100.*cls_correct/total, cls_correct, total))
+                            % (total/(i+1), 100.*cls_correct/total, cls_correct, total))
         
         accuracy, balanced_acc, class_accuracy, group_accuracy =  evaluate(cls_pred, cls_true, cls_groups)
-        wandb.log({"val class loss": test_cls_loss, "val dom loss": test_dom_loss, "val cls acc": accuracy, "val balanced class acc": balanced_acc, 
-                    "val class acc": class_accuracy, "val group acc": group_accuracy, "best val balanced acc": self.best_acc})
-        if balanced_acc > self.best_acc:
+
+        wandb.log({f"{phase} loss": total_loss, f"{phase} cls acc": accuracy, f"{phase} balanced class acc": balanced_acc, 
+                    f"{phase} class acc": class_accuracy, f"{phase} group acc": group_accuracy, f"best {phase} balanced acc": self.best_acc})
+        if phase == 'val' and balanced_acc > self.best_acc:
             self.best_acc, self.best_epoch = balanced_acc, epoch
             self.save_checkpoint(balanced_acc, epoch)
-    
+
     def eval(self, inputs, ret_probs=False):
         """ Forward pass for classification. if probs=True, return the softmax prob (for ensambling) """
         try:
@@ -590,6 +309,7 @@ class ClipMLP(Noop):
             preds = np.append(preds, cls_predicted.cpu().numpy())
         return preds, np.concatenate(probs, axis=0)
 
+
     def save_checkpoint(self, acc, epoch, last=False):
         print(f'Saving checkpoint with acc {acc} to ./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth...')
         state = {
@@ -602,12 +322,36 @@ class ClipMLP(Noop):
             os.makedirs(checkpoint_dir)
         if last:
             torch.save(state, f'./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth')
-            wandb.save(f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth')
+            # wandb.save(f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth')
         else:
             # make checkpoint directory and DomainNetMini directory
             torch.save(state, f'./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth')
-            wandb.save(f'./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth')
+            # wandb.save(f'./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth')
 
+def chunks(lst, n):
+    """Yield successive n-sized chunks from lst."""
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
+
+class ClipMLPZS(ClipMLP):
+
+    def __init__(self, text_prompts, model, cfg, neutral_prompts=[]):
+        super().__init__(text_prompts, model, cfg, neutral_prompts)
+        templates = getattr(helpers.text_templates, cfg.EXP.TEMPLATES)
+        # texts = [template.format(classname) for template in templates]
+        text_embs = zeroshot_classifier([[p.format(c) for p in templates] for c in self.class_names], model, model_type=self.cfg.EXP.IMAGE_FEATURES, cuda_device='1')
+        self.class_text_embs = text_embs.float().cuda()
+        print("class text embs", self.class_text_embs.shape)
+
+    def create_model(self, inputs):
+        B, W  = inputs.shape
+        self.model_conf = OmegaConf.create({"in_dim": W, "h_dim": self.cfg.METHOD.MODEL.HIDDEN_DIM, "out_dim": self.train_dataset.num_classes, "num_classes": self.train_dataset.num_classes, "num_domains": self.train_dataset.num_domains, "num_layers": self.cfg.METHOD.MODEL.NUM_LAYERS})
+        self.cfg = OmegaConf.merge(self.cfg, self.model_conf)
+        net = MPLZS(self.cfg, self.class_text_embs)
+        self.net = net.cuda()
+        net = torch.nn.DataParallel(self.net)
+        cudnn.benchmark = True
+    
 class DirectionLoss(torch.nn.Module):
     """
     Directional Loss taken from StyleGAN Nada paper. Takes in the normalized
@@ -632,6 +376,127 @@ class DirectionLoss(torch.nn.Module):
             return 1. - self.loss_func(x, y)
         
         return self.loss_func(x, y)
+
+
+from methods.predictors import DPLCLIP
+class DPL(ClipMLP):
+    """
+    Prompt learning targeted towards domain adaptation.
+    "Domain Prompt Learning for Efficiently Adapting CLIP to Unseen Domains"
+    """
+    def __init__(self, text_prompts, model, cfg, neutral_prompts=[]):
+        super().__init__(text_prompts, model, cfg, neutral_prompts)
+        self.clip_model = model.cpu()
+        self.model.eval()
+        self.model.cuda()
+        self.log_scale = self.clip_model.logit_scale
+
+    def load_checkpoint(self, path=None):
+        if not os.path.exists(path):
+            raise ValueError(f"checkpoint {path} does not exist!")
+        checkpoint = torch.load(path)
+        self.net.network.load_state_dict(checkpoint['net'])
+        print(f"...loaded checkpoint with acc {checkpoint['acc']}...")
+
+    def save_checkpoint(self, acc, epoch, last=False):
+        print(f'Saving checkpoint with acc {acc} to ./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth...')
+        state = {
+            "acc": acc,
+            "epoch": epoch,
+            "net": self.net.network.state_dict()
+        }
+        checkpoint_dir = '/'.join(f'./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}'.split('/')[:-1])
+        if not os.path.exists(checkpoint_dir):
+            os.makedirs(checkpoint_dir)
+        if last:
+            torch.save(state, f'./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth')
+            # wandb.save(f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth')
+        else:
+            # make checkpoint directory and DomainNetMini directory
+            torch.save(state, f'./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth')
+            # wandb.save(f'./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth')
+
+    def create_model(self, inputs):
+        B, W  = inputs.shape
+        self.model_conf = OmegaConf.create({"in_dim": W, "h_dim": self.cfg.METHOD.MODEL.HIDDEN_DIM, "out_dim": self.train_dataset.num_classes, "num_classes": self.train_dataset.num_classes, "num_domains": self.train_dataset.num_domains, "num_layers": self.cfg.METHOD.MODEL.NUM_LAYERS})
+        self.cfg = OmegaConf.merge(self.cfg, self.model_conf)
+        net = DPLCLIP(self.cfg, self.class_names, self.clip_model)
+        self.net = net.cuda()
+        for name, param in self.clip_model.named_parameters():
+            param.requires_grad_(False)
+        enabled = set()
+        for name, param in self.net.named_parameters():
+            if param.requires_grad:
+                enabled.add(name)
+        print(f"Parameters to be updated: {enabled}")
+        net = torch.nn.DataParallel(self.net)
+        cudnn.benchmark = True
+
+    def train_val_loop(self, loader, epoch, phase="train"):
+        """
+        One epoch of train-val loop.
+        Returns of dict of metrics to log
+        """
+        total_loss, cls_correct, total = 0,0,0
+        if phase == "train":
+            self.net.train()
+        else:
+            self.net.eval()
+        total_loss, cls_correct, total = 0, 0, 0
+        cls_true, cls_pred, cls_groups, dom_true = np.array([]), np.array([]), np.array([]), np.array([])
+        with torch.set_grad_enabled(phase == 'train'):
+            for i, (inp, cls_target, cls_group, dom_target) in enumerate(loader):
+                inp, cls_target = inp.cuda(), cls_target.cuda()
+                if phase == "train":
+                    logits, loss = self.net.update(inp, cls_target)
+                    conf, cls_predicted = torch.max(logits.softmax(dim=-1), dim=-1)
+                else:
+                    logits, conf, cls_predicted = self.net.predict(inp)
+                    loss = torch.nn.functional.cross_entropy(logits, cls_target.long())
+
+                total_loss += loss.item()
+                total += cls_target.size(0)
+                cls_correct += cls_predicted.eq(cls_target).sum().item()
+
+                cls_true = np.append(cls_true, cls_target.cpu().numpy())
+                cls_pred = np.append(cls_pred, cls_predicted.cpu().numpy())
+                cls_groups = np.append(cls_groups, cls_group.cpu().numpy())
+                dom_true = np.append(dom_true, dom_target.cpu().numpy())
+                progress_bar(i, len(self.test_loader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
+                            % (total/(i+1), 100.*cls_correct/total, cls_correct, total))
+
+        accuracy, balanced_acc, class_accuracy, group_accuracy =  evaluate(cls_pred, cls_true, cls_groups)
+        wandb.log({"epoch": epoch, f"{phase} loss": total_loss, f"{phase} cls acc": accuracy, f"{phase} balanced class acc": balanced_acc, 
+                    f"{phase} class acc": class_accuracy, f"{phase} group acc": group_accuracy, f"best {phase} balanced acc": self.best_acc})
+        if phase == 'val' and balanced_acc > self.best_acc:
+            self.best_acc, self.best_epoch = balanced_acc, epoch
+            self.save_checkpoint(balanced_acc, epoch)
+
+    def predict(self, img_embeddings, label=None):
+        return self.net.predict(img_embeddings.half().cuda())
+
+    def eval(self, inputs, ret_probs=False):
+        """ Forward pass for classification. if probs=True, return the softmax prob (for ensambling) """
+        try:
+            ckpt = f"./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth"
+            print(f"loading checkpoint {ckpt}...")
+            self.load_checkpoint(ckpt)
+        except:
+            ckpt = f"./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth"
+            print(f"loading checkpoint {ckpt}...")
+            self.load_checkpoint(ckpt)
+        generator = chunks(torch.tensor(inputs).cuda().float(), self.cfg.DATA.BATCH_SIZE)
+        preds, probs = np.array([]), []
+        for i, inp in enumerate(generator):
+            if self.cfg.METHOD.NORMALIZE_OUTPUT:
+                logits, conf, cls_predicted = self.predict(inp / inp.norm(dim=-1, keepdim=True))
+            else:
+                logits, conf, cls_predicted = self.predict(inp)
+            print(conf.detach().cpu().numpy().shape)
+            probs.append(conf.detach().cpu().numpy())
+            preds = np.append(preds, cls_predicted.cpu().numpy())
+            print(np.concatenate(probs, axis=0).shape)
+        return preds, np.concatenate(probs, axis=0)
 
 class AugE2EMLPMulti(ClipMLP):
     """
@@ -663,14 +528,6 @@ class AugE2EMLPMulti(ClipMLP):
         try:
             self.orig_prompts = torch.Tensor(self.get_orig_text_embeddings(self.text_prompts).transpose((1, 0, 2))).float().cuda()
             self.neutral_embs = torch.Tensor(self.get_orig_text_embeddings(self.neutral_prompts).transpose((1, 0, 2))).float().cuda()
-            # if len(self.orig_prompts) > 1:
-            #     raise ValueError("this only works for one domain shift atm")
-            print('=========================')
-            print('=========================')
-            print("task specific text emb ", self.orig_prompts.shape, self.orig_prompts[0].shape, torch.transpose(self.orig_prompts[0].float().cuda(), 1, 0).shape, self.class_text_embs.shape)
-            print('=========================')
-            print('=========================')
-            # stack = [torch.mean(self.neutral_embs, dim=1)] + torch.mean(self.orig_prompts, dim=1)
             self.val_dom_check = torch.squeeze(torch.cat([torch.mean(self.neutral_embs, dim=1), torch.mean(self.orig_prompts, dim=1)]), dim=1).float().cuda()
             self.val_dom_check = torch.transpose(self.val_dom_check, 0, 1)
             print("val domain check shape ", self.val_dom_check.shape, self.class_text_embs.shape)
@@ -698,10 +555,10 @@ class AugE2EMLPMulti(ClipMLP):
         }
         if last:
             torch.save(state, f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth')
-            wandb.save(f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth')
+            # wandb.save(f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth')
         else:
             torch.save(state, f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth')
-            wandb.save(f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth')
+            # wandb.save(f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth')
 
     def create_model(self, inputs):
         B, W  = inputs.shape
@@ -973,518 +830,3 @@ class AugE2EMLPMulti(ClipMLP):
 
         return np.array(augmented_features), np.array(augmented_labels), np.array(augmented_domain_labels), np.array(augmented_filenames)   
 
-class AugE2EBiasMLP(AugE2EMLPMulti):
-    """
-    E2E version of BiasDirectional
-    """
-    def __init__(self, text_prompts, model, cfg, neutral_prompts=[]):
-        super().__init__(text_prompts, model, cfg, neutral_prompts)
-        # if self.cfg.AUGMENTATION.DOM_SPECIFIC_XE:
-        # self.orig_prompts = torch.Tensor(self.get_orig_text_embeddings(self.text_prompts).transpose((1, 0, 2))).float().cuda()
-        # print("orig prompts shape ", self.orig_prompts.shape)
-        #     self.text_features = torch.mean(self.orig_prompts, dim=1)
-        #     text_features = self.text_features
-        # else:
-        self.text_features = torch.tensor(self.orig_prompts).float().cuda()
-        print("text features shape ", self.text_features.shape)
-        if len(self.text_features.shape) == 3:
-            self.dom_text_features = torch.mean(self.text_features, dim=1)
-        else:
-            self.dom_text_features = self.text_features
-        print("NEW text features shape ", self.text_features.shape)
-        if self.cfg.AUGMENTATION.DOM_SPECIFIC_XE:
-            self.class_text_embs = self.orig_prompts
-        else:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            model, preprocess = clip.load(self.cfg.EXP.CLIP_MODEL, device)
-            model.eval()
-            text_embs = zeroshot_classifier([[f"a photo of the number {c}"] for c in self.class_names], model, model_type=cfg.EXP.IMAGE_FEATURES)
-            self.class_text_embs = text_embs.float().cuda()
-
-    def create_model(self, inputs):
-        B, W  = inputs.shape
-        self.model_conf = OmegaConf.create({"in_dim": W, "h_dim": W, "out_dim": self.train_dataset.num_classes, "num_classes": self.train_dataset.num_classes, "num_domains": self.train_dataset.num_domains, "num_layers": self.cfg.METHOD.MODEL.NUM_LAYERS})
-        self.cfg = OmegaConf.merge(self.cfg, self.model_conf)
-        net = MLP(self.cfg)
-        self.net = net.cuda()
-        # net = torch.nn.DataParallel(self.net)
-        cudnn.benchmark = True
-        self.augmentation_model_conf = OmegaConf.create({"in_dim": W, "h_dim": self.cfg.AUGMENTATION.MODEL.HIDDEN_DIM, "out_dim": W, "num_classes": self.train_dataset.num_classes, "num_layers": self.cfg.AUGMENTATION.MODEL.NUM_LAYERS})
-        self.num_domains = len(self.text_prompts)
-        aug_net = nn.ModuleList([MLP(OmegaConf.merge(self.cfg, self.augmentation_model_conf))])
-        self.aug_net = aug_net.cuda()
-        # self.aug_net = torch.nn.DataParallel(self.aug_net)
-        wandb.watch(aug_net, log_freq=10)
-        print("NUM DOMAINS ", len(self.text_prompts), self.text_prompts, self.train_dataset.num_domains)
-
-    def train_debias(self, inputs, labels, groups, dom_gt, test_inputs, test_labels, test_groups, test_dom_gt):
-        """
-        Set up data, model, loss, opt and run
-        """
-        self.train_dataset = EmbeddingDataset(self.cfg, inputs, labels, groups, dom_gt, text_emb=self.dom_text_features)
-        self.train_loader = torch.utils.data.DataLoader(self.train_dataset, batch_size=self.cfg.DATA.BATCH_SIZE, shuffle=True)
-        self.test_dataset = EmbeddingDataset(self.cfg, test_inputs, test_labels, test_groups, test_dom_gt, text_emb=self.dom_text_features)
-        self.test_loader = torch.utils.data.DataLoader(self.test_dataset, batch_size=self.cfg.DATA.BATCH_SIZE, shuffle=False)
-
-        self.create_model(inputs) # create model
-        if self.cfg.METHOD.MODEL.RESUME:
-            self.load_checkpoint(self.cfg.METHOD.MODEL.CHECKPOINT)
-    
-        self.optimizer = AdamW(self.net.parameters(), lr=self.cfg.METHOD.MODEL.LR, weight_decay=self.cfg.METHOD.MODEL.WEIGHT_DECAY)
-        self.aug_optimizer = AdamW(self.aug_net.parameters(), lr=self.cfg.AUGMENTATION.MODEL.LR, weight_decay=self.cfg.AUGMENTATION.MODEL.WEIGHT_DECAY)
-        self.create_criterion() # get loss functions
-
-        if not self.cfg.METHOD.MODEL.RESUME:
-            self.best_acc, self.best_epoch = 0, 0
-            for epoch in range(self.cfg.EXP.EPOCHS):
-                self.train(epoch)
-                if self.cfg.EXP.CHECKPOINT_VAL:
-                    self.test(epoch, load=False)
-            self.save_checkpoint(self.best_acc, epoch, last=True)
-            wandb.summary['best val balanced acc'] = self.best_acc
-            wandb.summary['best epoch'] = self.best_epoch
-
-    @staticmethod
-    def get_inv(label):
-        return 1 if label == 0 else 0
-    
-    @staticmethod
-    def filter(inp, dom_target, domain):
-        # print(dom_target[dom_target == domain])
-        if len(dom_target[dom_target == domain]) == 0:
-            return torch.tensor([])
-        return torch.stack([inp[i] for i in range(len(dom_target)) if dom_target[i].item() == domain]).cuda()
-
-    def train(self, epoch):
-        print(f"Epoch {epoch}")
-        torch.autograd.set_detect_anomaly(True)
-        self.net.train()
-        self.aug_net.train()
-        train_cls_loss, train_dom_loss, train_loss, train_reg_loss, cls_correct, total = 0, 0, 0, 0, 0, 0
-        for i, (inp, cls_target, cls_group, dom_target) in enumerate(self.train_loader):
-            inp, cls_target = inp.cuda().float(), cls_target.cuda().long()
-            self.aug_optimizer.zero_grad()
-            self.optimizer.zero_grad()
-            if self.cfg.METHOD.NORMALIZE_OUTPUT:
-                cls_outputs = self.net(inp / inp.norm(dim=-1, keepdim=True))
-            else:
-                cls_outputs = self.net(inp)
-
-            img_directional, text_directional = [], []
-            out, labels, nn_labels, nn_out = [], [], [], []
-            aug_logits, aug_labels = [], []
-            cycle_gan_inp, cycle_aug_inp = [], []
-
-            if np.random.rand() <= self.cfg.AUGMENTATION.RANDOMIZE_PROB:
-                out.append(cls_outputs)
-                labels.append(cls_target)
-
-            for domain in range(len(self.aug_net)):
-                aug_inp = self.aug_net[domain](inp)
-                # dom_inp = self.filter(inp, dom_target, domain)
-                # dom_lab = self.filter(cls_target, dom_target, domain)
-                # dom_aug_inp = self.filter(aug_inp, dom_target, domain) 
-                # if len(dom_aug_inp) == 0:
-                #     continue
-                if self.cfg.METHOD.NORMALIZE_OUTPUT:
-                    aug_cls_outputs = self.net(aug_inp / aug_inp.norm(dim=-1, keepdim=True))
-                else:
-                    aug_cls_outputs = self.net(aug_inp)
-
-                # dom_aug_out = self.filter(aug_cls_outputs, dom_target, domain)
-                
-                if self.cfg.AUGMENTATION.RANDOMIZE:
-                    if np.random.rand() > 0.5:
-                        out.append(aug_cls_outputs)
-                        labels.append(cls_target)
-                else:
-                    out.append(aug_cls_outputs)
-                    labels.append(cls_target)
-
-                # compute directional loss
-                if self.cfg.METHOD.NORMALIZE:
-                    diff_img_embeddings = torch.sub(aug_inp / aug_inp.norm(dim=-1, keepdim=True), inp)
-                else:
-                    diff_img_embeddings = torch.sub(aug_inp, inp)
-                img_directional.append(diff_img_embeddings / diff_img_embeddings.norm(dim=-1, keepdim=True))
-                num_classes, num_domains, emb_dim = self.text_features.shape
-                text_emb = torch.tensor(self.text_features).cuda()
-
-                if not self.cfg.AUGMENTATION.GENERIC:
-                    text_diffs = torch.stack([torch.sub(text_emb[self.get_inv(d)][y], text_emb[d][y]) for d, y in zip(dom_target, cls_target)])
-                else:
-                    text_diffs = torch.stack([torch.sub(text_emb[self.get_inv(d)], text_emb[d]) for d in dom_target])
-
-                text_directional.append(text_diffs)
-
-                if self.cfg.AUGMENTATION.DOM_SPECIFIC_XE:
-                    cls_logits = self.get_class_logits(aug_inp, torch.transpose(self.orig_prompts[self.get_inv(domain)].float().cuda(), 1, 0))
-                else:
-                    cls_logits = self.get_class_logits(aug_inp / aug_inp.norm(dim=-1, keepdim=True), self.class_text_embs)
-                # cls_logits = self.get_class_logits(aug_inp / aug_inp.norm(dim=-1, keepdim=True), self.class_text_embs)  
-                aug_logits.append(cls_logits)
-                aug_labels.append(cls_target) 
-            
-            clip_cls_loss = self.cfg.AUGMENTATION.CC_WEIGHT * self.class_criterion(torch.cat(aug_logits).cuda(), torch.cat(aug_labels).cuda())
-            cls_loss = (1 - self.cfg.AUGMENTATION.ALPHA) * self.class_criterion(torch.cat(out).cuda(), torch.cat(labels).cuda())
-            if self.cfg.METHOD.NORMALIZE:
-                reg_loss = self.cfg.AUGMENTATION.REG_WEIGHT * self.domain_criterion(inp, aug_inp / aug_inp.norm(dim=-1, keepdim=True)).mean()
-            else:
-                reg_loss = self.cfg.AUGMENTATION.REG_WEIGHT * self.domain_criterion(inp, aug_inp).mean()
-                
-            domain_loss = self.cfg.AUGMENTATION.DOM_WEIGHT * self.cfg.AUGMENTATION.ALPHA * self.domain_criterion(torch.cat(img_directional).cuda(), torch.cat(text_directional).cuda()).mean()
-            # breakpoint()
-
-            loss = cls_loss + domain_loss + reg_loss + clip_cls_loss
-            loss.backward()
-            self.aug_optimizer.step()
-            self.optimizer.step()
-
-            train_cls_loss += cls_loss.item()
-            train_dom_loss += domain_loss.item()
-            train_loss += train_cls_loss + train_dom_loss
-            train_reg_loss += reg_loss.item()
-            _, cls_predicted = self.m(torch.cat(out)).max(1)
-            total += torch.cat(labels).size(0)
-            cls_correct += cls_predicted.eq(torch.cat(labels)).sum().item()
-
-            progress_bar(i, len(self.train_loader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                         % (train_cls_loss/(i+1), 100.*cls_correct/total, cls_correct, total))
-
-        wandb.log({"train loss": train_loss/(i+1), "class loss": train_cls_loss/(i+1), "domain loss": train_dom_loss/(i+1), "train cls acc": 100.*cls_correct/total, "reg loss": train_reg_loss/(i+1)})
-
-    def test(self, epoch, load=True):
-        ## load best model
-        if load:
-            ckpt = f"./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth"
-            self.load_checkpoint(ckpt)
-        self.net.eval()
-        self.aug_net.eval()
-        test_cls_loss, test_dom_loss, cls_correct, total = 0, 0, 0, 0
-        cls_true, cls_pred, cls_groups, dom_true = np.array([]), np.array([]), np.array([]), np.array([])
-
-
-        with torch.no_grad():
-            for i, (inp, cls_target, cls_group, dom_target) in enumerate(self.test_loader):
-                img_directional, text_directional = [], []
-                out, labels, groups = [], [], []
-                aug_logits, aug_labels = [], []
-
-                inp, cls_target = inp.cuda().float(), cls_target.cuda().long()
-                if self.cfg.METHOD.NORMALIZE_OUTPUT:
-                    cls_outputs = self.net(inp / inp.norm(dim=-1, keepdim=True))
-                else:
-                    cls_outputs = self.net(inp)
-                out.append(cls_outputs)
-                labels.append(cls_target)
-                groups.append(cls_group)
-
-                for domain in range(len(self.aug_net)):
-                    aug_inp = self.aug_net[domain](inp)
-                    # if self.cfg.METHOD.NORMALIZE_OUTPUT:
-                    #     aug_outputs = self.net(aug_inp / aug_inp.norm(dim=-1, keepdim=True))
-                    # else:
-                    #     aug_outputs = self.net(aug_inp)
-                    if self.cfg.METHOD.NORMALIZE_OUTPUT:
-                        aug_cls_outputs = self.net(aug_inp / aug_inp.norm(dim=-1, keepdim=True))
-                    else:
-                        aug_cls_outputs = self.net(aug_inp)
-                
-                    out.append(aug_cls_outputs)
-                    labels.append(cls_target)
-                    groups.append(cls_group)
-
-                    # compute directional loss
-                    if self.cfg.METHOD.NORMALIZE:
-                        diff_img_embeddings = torch.sub(aug_inp / aug_inp.norm(dim=-1, keepdim=True), inp)
-                    else:
-                        diff_img_embeddings = torch.sub(aug_inp, inp)
-                    img_directional.append(diff_img_embeddings / diff_img_embeddings.norm(dim=-1, keepdim=True))
-                    num_classes, num_domains, emb_dim = self.text_features.shape
-                    text_emb = torch.tensor(self.text_features).cuda()
-
-                    if not self.cfg.AUGMENTATION.GENERIC:
-                        text_diffs = torch.stack([torch.sub(text_emb[self.get_inv(d)][y], text_emb[d][y]) for d, y in zip(dom_target, cls_target)])
-                    else:
-                        text_diffs = torch.stack([torch.sub(text_emb[self.get_inv(d)], text_emb[d]) for d in dom_target])
-
-                    text_directional.append(text_diffs)
-
-                    if self.cfg.AUGMENTATION.DOM_SPECIFIC_XE:
-                        cls_logits = self.get_class_logits(aug_inp, torch.transpose(self.orig_prompts[self.get_inv(domain)].float().cuda(), 1, 0))
-                    else:
-                        cls_logits = self.get_class_logits(aug_inp / aug_inp.norm(dim=-1, keepdim=True), self.class_text_embs)
-                    # cls_logits = self.get_class_logits(aug_inp / aug_inp.norm(dim=-1, keepdim=True), self.class_text_embs)  
-                    aug_logits.append(cls_logits)
-                    aug_labels.append(cls_target) 
-                    
-                # cls_loss = self.cfg.AUGMENTATION.CC_WEIGHT * self.class_criterion(torch.cat(aug_logits).cuda(), torch.cat(aug_labels).cuda())
-                cls_loss = (1 - self.cfg.AUGMENTATION.ALPHA) * self.class_criterion(torch.cat(out).cuda(), torch.cat(labels).cuda())
-                domain_loss = self.cfg.AUGMENTATION.DOM_WEIGHT * self.cfg.AUGMENTATION.ALPHA * self.domain_criterion(torch.cat(img_directional).cuda(), torch.cat(text_directional).cuda()).mean()
-
-                test_cls_loss += cls_loss.item()
-                test_dom_loss += domain_loss.item()
-                _, cls_predicted = self.m(torch.cat(out).cuda()).max(1)
-                total += cls_target.size(0)
-
-                cls_correct += cls_predicted.eq(torch.cat(labels).cuda()).sum().item()
-                # this is for creating the confusion matrix
-                cls_true = np.append(cls_true, torch.cat(labels).cpu().numpy())
-                cls_pred = np.append(cls_pred, cls_predicted.cpu().numpy())
-                cls_groups = np.append(cls_groups, torch.cat(groups).cpu().numpy())
-                # dom_true = np.append(dom_true, dom_target.cpu().numpy())
-
-                progress_bar(i, len(self.test_loader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                            % (test_cls_loss/(i+1), 100.*cls_correct/total, cls_correct, total))
-        
-        accuracy, balanced_acc, class_accuracy, group_accuracy =  evaluate(cls_pred, cls_true, cls_groups)
-        wandb.log({"val class loss": test_cls_loss, "val dom loss": test_dom_loss, "val cls acc": accuracy, "val balanced class acc": balanced_acc, 
-                    "val class acc": class_accuracy, "val group acc": group_accuracy, "best val balanced acc": self.best_acc})
-        if balanced_acc > self.best_acc:
-            self.best_acc, self.best_epoch = balanced_acc, epoch
-            self.save_checkpoint(balanced_acc, epoch)
-
-    def augment_dataset(self, image_features, labels, domain_labels, filenames):
-        """
-        Used to check the quality of augmentation network. Computes the augmented embeddings
-        and changes the domain (rn only works with 1 domain) to be used in the nearest neighbor
-        ablations. 
-        """
-        ckpt = f"./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth"
-        print(f"loading checkpoint {ckpt}...")
-        self.load_checkpoint(ckpt)
-        print("domain indices", self.domain_indexes, self.domain_names)
-
-        self.aug_net.eval()
-        augmented_features = []
-        augmented_labels = []
-        augmented_domain_labels = []
-        augmented_filenames = []
-        for inp, label, domain, filename in zip(image_features, labels, domain_labels, filenames):
-            aug_inp = self.aug_net[0](torch.unsqueeze(torch.Tensor(inp).float().cuda(), dim=0))
-            aug_inp /= aug_inp.norm(dim=-1, keepdim=True)
-            augmented_features += [aug_inp.detach().cpu().numpy()[0]]
-            augmented_labels += [label]
-            augmented_domain_labels += [self.get_inv(domain)]
-            augmented_filenames += [filename]
-
-        return np.array(augmented_features), np.array(augmented_labels), np.array(augmented_domain_labels), np.array(augmented_filenames)   
-
-class AugE2EBiasMLPNew(AugE2EBiasMLP):
-    
-    def train(self, epoch):
-        print(f"Epoch {epoch}")
-        self.net.train()
-        self.aug_net.train()
-        train_cls_loss, train_dom_loss, train_loss, train_reg_loss, cls_correct, total = 0, 0, 0, 0, 0, 0
-        for i, (inp, cls_target, cls_group, dom_target) in enumerate(self.train_loader):
-            inp, cls_target= inp.cuda().float(), cls_target.cuda().long()
-            self.aug_optimizer.zero_grad()
-            self.optimizer.zero_grad()
-            if self.cfg.METHOD.NORMALIZE_OUTPUT:
-                cls_outputs = self.net(inp / inp.norm(dim=-1, keepdim=True))
-            else:
-                cls_outputs = self.net(inp)
-
-            img_directional, text_directional = [], []
-            out, labels, nn_labels, nn_out = [], [], [], []
-            aug_logits, aug_labels = [], []
-
-            if np.random.rand() <= self.cfg.AUGMENTATION.RANDOMIZE_PROB:
-                out.append(cls_outputs)
-                labels.append(cls_target)
-
-            for domain in range(self.num_domains):
-                aug_inp = self.aug_net[domain](inp)
-                if self.cfg.METHOD.NORMALIZE_OUTPUT:
-                    aug_cls_outputs = self.net(aug_inp / aug_inp.norm(dim=-1, keepdim=True))
-                else:
-                    aug_cls_outputs = self.net(aug_inp)
-                
-                if self.cfg.AUGMENTATION.RANDOMIZE:
-                    if np.random.rand() > 0.5:
-                        out.append(aug_cls_outputs)
-                        labels.append(cls_target)
-                else:
-                    out.append(aug_cls_outputs)
-                    labels.append(cls_target)
-
-                # compute directional loss
-                if self.cfg.METHOD.NORMALIZE:
-                    diff_img_embeddings = torch.sub(aug_inp / aug_inp.norm(dim=-1, keepdim=True), inp)
-                else:
-                    diff_img_embeddings = torch.sub(aug_inp, inp)
-                img_directional.append(diff_img_embeddings / diff_img_embeddings.norm(dim=-1, keepdim=True))
-                num_classes, num_domains, emb_dim = self.text_embeddings.shape
-                text_emb = torch.Tensor(self.text_embeddings[:, domain, :]).reshape((num_classes, 1, emb_dim)).cuda()
-
-                if not self.cfg.AUGMENTATION.GENERIC:
-                    text_diffs = torch.cat([text_emb[y] for y in cls_target])
-                else:
-                    text_diffs = torch.cat([text_emb for y in cls_target])
-
-                text_directional.append(text_diffs)
-
-                if self.cfg.AUGMENTATION.DOM_SPECIFIC_XE:
-                    cls_logits = self.get_class_logits(aug_cls_outputs, torch.transpose(self.orig_prompts[domain].float().cuda(), 1, 0))
-                else:
-                    cls_logits = self.get_class_logits(aug_inp / aug_inp.norm(dim=-1, keepdim=True), self.class_text_embs)
-                # cls_logits = self.get_class_logits(aug_inp / aug_inp.norm(dim=-1, keepdim=True), self.class_text_embs)  
-                aug_logits.append(cls_logits)
-                aug_labels.append(cls_target) 
-            
-            clip_cls_loss = self.cfg.AUGMENTATION.CC_WEIGHT * self.class_criterion(torch.cat(aug_logits).cuda(), torch.cat(aug_labels).cuda())
-            cls_loss = (1 - self.cfg.AUGMENTATION.ALPHA) * self.class_criterion(torch.cat(out).cuda(), torch.cat(labels).cuda())
-            if self.cfg.METHOD.NORMALIZE:
-                reg_loss = self.cfg.AUGMENTATION.REG_WEIGHT * self.domain_criterion(inp, aug_inp / aug_inp.norm(dim=-1, keepdim=True)).mean()
-            else:
-                reg_loss = self.cfg.AUGMENTATION.REG_WEIGHT * self.domain_criterion(inp, aug_inp).mean()
-                
-            domain_loss = self.cfg.AUGMENTATION.DOM_WEIGHT * self.cfg.AUGMENTATION.ALPHA * self.domain_criterion(torch.cat(img_directional).cuda(), torch.cat(text_directional).cuda()).mean()
-            # breakpoint()
-
-            loss = cls_loss + domain_loss + reg_loss + clip_cls_loss
-            loss.backward()
-            self.aug_optimizer.step()
-            self.optimizer.step()
-
-            train_cls_loss += cls_loss.item()
-            train_dom_loss += domain_loss.item()
-            train_loss += train_cls_loss + train_dom_loss
-            train_reg_loss += reg_loss.item()
-            _, cls_predicted = self.m(torch.cat(out)).max(1)
-            total += torch.cat(labels).size(0)
-            cls_correct += cls_predicted.eq(torch.cat(labels)).sum().item()
-
-            progress_bar(i, len(self.train_loader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                         % (train_cls_loss/(i+1), 100.*cls_correct/total, cls_correct, total))
-
-        wandb.log({"train loss": train_loss/(i+1), "class loss": train_cls_loss/(i+1), "domain loss": train_dom_loss/(i+1), "train cls acc": 100.*cls_correct/total, "reg loss": train_reg_loss/(i+1)})
-
-
-class MLPDebias(ClipMLP):
-    """
-    Train DANN version where the source and target are weakly labeled domains
-    """
-    def __init__(self, text_prompts, model, cfg, neutral_prompts=[]):
-        super().__init__(text_prompts, model, cfg, neutral_prompts)
-        self.text_emb = zeroshot_classifier(text_prompts, model, model_type=cfg.EXP.IMAGE_FEATURES).T # translates text-> embedding
-    
-    def create_model(self, inputs):
-        B, W  = inputs.shape
-        self.model_conf = OmegaConf.create({"in_dim": W, "h_dim": W, "out_dim": W, "num_classes": self.train_dataset.num_classes, "num_domains": self.train_dataset.num_domains, "num_layers": self.cfg.METHOD.MODEL.NUM_LAYERS})
-        self.cfg = OmegaConf.merge(self.cfg, self.model_conf)
-        self.net = EmbeddingDebiasModel(self.cfg)
-        self.net = self.net.cuda()
-        net = torch.nn.DataParallel(self.net)
-        cudnn.benchmark = True
-
-    def create_criterion(self):
-        weights = self.train_dataset.class_weights.cuda() if self.cfg.DATA.UPWEIGHT_CLASSES else None
-        dom_weights = self.train_dataset.dom_weights.cuda() if self.cfg.DATA.UPWEIGHT_DOMAINS else None
-        if self.model_conf.num_classes == 2 and not self.cfg.METHOD.MODEL.SEPERATE_CLASSES:
-            self.class_criterion = nn.BCEWithLogitsLoss()
-            self.dom_criterion = nn.BCEWithLogitsLoss()
-            self.m = nn.Sigmoid()
-        else:
-            self.class_criterion = nn.CrossEntropyLoss(weight=weights)
-            self.dom_criterion = nn.CrossEntropyLoss(weight=dom_weights)
-            self.m = nn.Softmax(dim=1)
-            if self.cfg.METHOD.MODEL.WEAK_LABELS: # KL is used instead of CE because pytorch CE doesnt support soft labels
-                print(".. using soft labels")
-                self.dom_criterion = nn.KLDivLoss(reduction="batchmean")
-                self.m = nn.Softmax(dim=1)
-            else:
-                self.dom_criterion = nn.CrossEntropyLoss(weight=dom_weights)
-                self.m = nn.Softmax(dim=1)
-
-    def train(self, epoch):
-        print(f"Epoch {epoch}")
-        self.net.train()
-        train_cls_loss, train_dom_loss, train_loss, cls_correct, dom_correct, total = 0, 0, 0, 0, 0, 0
-        num_epochs = self.cfg.EXP.EPOCHS
-        len_train_loader = len(self.train_loader)
-        for i, (inp, cls_target, cls_group, dom_target) in enumerate(self.train_loader):
-            p = float(i + epoch * len_train_loader) / num_epochs / len_train_loader
-            alpha = (2. / (1. + np.exp(-10 * p)) - 1) * self.cfg.METHOD.MODEL.DOM_WEIGHT
-
-            inp, cls_target, dom_target = inp.cuda().float(), cls_target.cuda().long(), dom_target.cuda().long()
-            self.optimizer.zero_grad()
-            cls_outputs, dom_outputs = self.net(inp, alpha = alpha)
-            cls_loss = self.class_criterion(cls_outputs, cls_target)
-            if self.cfg.METHOD.MODEL.WEAK_LABELS:
-                target = torch.full(dom_outputs.shape, 1/self.train_dataset.num_domains).cuda()
-                dom_loss = cross_entropy_with_probs(dom_outputs, target) * self.cfg.METHOD.MODEL.DOM_WEIGHT
-            else:
-                dom_loss = self.dom_criterion(dom_outputs, dom_target)
-            loss = cls_loss + dom_loss
-            loss.backward()
-            self.optimizer.step()
-
-            train_cls_loss += cls_loss.item()
-            train_dom_loss += dom_loss.item()
-            train_loss += train_cls_loss + train_dom_loss
-            _, cls_predicted = self.m(cls_outputs).max(1)
-            _, dom_predicted = self.m(dom_outputs).max(1)
-            total += cls_target.size(0)
-            cls_correct += cls_predicted.eq(cls_target).sum().item()
-            dom_correct += dom_predicted.eq(dom_target).sum().item()
-
-            progress_bar(i, len(self.train_loader), 'Loss: %.3f | Acc: %.3f%% (%d/%d) | Domain Acc: %.3f%% (%d/%d)'
-                         % (train_cls_loss/(i+1), 100.*cls_correct/total, cls_correct, total, 100.*dom_correct/total, dom_correct, total))
-
-        wandb.log({"class loss": train_cls_loss/(i+1), "dom loss": train_dom_loss/(i+1), "train cls acc": 100.*cls_correct/total, "train dom acc": 100.*dom_correct/total})
-
-    def test(self, epoch, load=False):
-        self.net.eval()
-        test_cls_loss, test_dom_loss, cls_correct, dom_correct, total = 0, 0, 0, 0, 0
-        cls_true, cls_pred, cls_groups, dom_true, dom_pred = np.array([]), np.array([]), np.array([]), np.array([]), np.array([])
-        with torch.no_grad():
-            for i, (inp, cls_target, cls_group, dom_target) in enumerate(self.test_loader):
-                inp, cls_target, dom_target = inp.cuda().float(), cls_target.cuda().long(), dom_target.cuda().long()
-                cls_outputs, dom_outputs = self.net(inp)
-                cls_loss = self.class_criterion(cls_outputs, cls_target)
-                if self.cfg.METHOD.MODEL.WEAK_LABELS:
-                    target = torch.full(dom_outputs.shape, 1/self.train_dataset.num_domains).cuda()
-                    dom_loss = cross_entropy_with_probs(dom_outputs, target)
-                else:
-                    dom_loss = self.dom_criterion(dom_outputs, dom_target)
-                loss = cls_loss + dom_loss
-
-                test_cls_loss += cls_loss.item()
-                test_dom_loss += dom_loss.item()
-                _, cls_predicted = self.m(cls_outputs).max(1)
-                _, dom_predicted = self.m(dom_outputs).max(1)
-                total += cls_target.size(0)
-                cls_correct += cls_predicted.eq(cls_target).sum().item()
-                dom_correct += dom_predicted.eq(dom_target).sum().item()
-                # this is for creating the confusion matrix
-                cls_true = np.append(cls_true, cls_target.cpu().numpy())
-                cls_pred = np.append(cls_pred, cls_predicted.cpu().numpy())
-                cls_groups = np.append(cls_groups, cls_group.cpu().numpy())
-                dom_true = np.append(dom_true, dom_target.cpu().numpy())
-                dom_pred = np.append(dom_pred, dom_predicted.cpu().numpy())
-
-                progress_bar(i, len(self.test_loader), 'Loss: %.3f | Acc: %.3f%% (%d/%d) | Domain Acc: %.3f%% (%d/%d)'
-                            % (test_cls_loss/(i+1), 100.*cls_correct/total, cls_correct, total, 100.*dom_correct/total, dom_correct, total))
-        
-        accuracy, balanced_acc, class_accuracy, group_accuracy =  evaluate(cls_pred, cls_true, cls_groups)
-        dom_accuracy, dom_balanced_acc, dom_class_accuracy =  evaluate(dom_pred, dom_true)
-        wandb.log({"val class loss": test_cls_loss/(i+1), "val dom loss": test_dom_loss/(i+1), "val cls acc": accuracy, "val balanced class acc": balanced_acc, 
-                    "val class acc": class_accuracy, "val dom acc": dom_accuracy, "val balanced dom acc": dom_balanced_acc, 
-                    "val dom class acc": dom_class_accuracy, "val group acc": group_accuracy})
-        if balanced_acc > self.best_acc:
-            self.best_acc, self.best_epoch = balanced_acc, epoch
-            self.save_checkpoint(balanced_acc, epoch)
-
-    def eval(self, inputs):
-        """ Farward pass for classification """
-        ckpt = f"./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}.pth"
-        print(f"loading checkpoint {ckpt}...")
-        generator = chunks(torch.tensor(inputs).cuda().float(), self.cfg.DATA.BATCH_SIZE)
-        preds = np.array([])
-        for i, inp in enumerate(generator):
-            cls_outputs, _ = self.net(inp)
-            _, cls_predicted = self.m(cls_outputs).max(1)
-            preds = np.append(preds, cls_predicted.cpu().numpy())
-        return preds

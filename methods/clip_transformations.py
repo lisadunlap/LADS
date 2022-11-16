@@ -28,7 +28,7 @@ except:
 import uuid
 
 from methods.predictors import EmbeddingDebiasModel, MLP, Predictor, MPLZS
-from clip_utils import zeroshot_classifier, evaluate
+from clip_utils import zeroshot_classifier, evaluate, get_domain_text_embs
 
 import helpers.text_templates
 from helpers.text_templates import imagenet_templates, part_templates, imagenet_templates_small
@@ -45,11 +45,11 @@ class Noop:
     If EXP.GENERAL=False, then we compute the embeddings for each class (num_text_prompts, )
     """
     def __init__(self, text_prompts, model, cfg, neutral_prompts=[]):
-        if cfg.AUGMENTATION.GENERIC:
-            print("using generic prompts")
-            assert type(text_prompts[0]) == list
-        else:
-            assert type(text_prompts[0]) == str
+        # if cfg.AUGMENTATION.GENERIC:
+        #     print("using generic prompts")
+        #     assert type(text_prompts[0]) == list
+        # else:
+        #     assert type(text_prompts[0]) == str
         self.class_names = DATASET_CLASSES[cfg.DATA.DATASET]
         self.domain_names = DATASET_DOMAINS[cfg.DATA.DATASET]
         self.text_prompts = text_prompts
@@ -132,6 +132,95 @@ class Noop:
                     ret.append([int(labels[i]), self.text_prompts[j], j, dist])
         return pd.DataFrame(ret[1:], columns=ret[0])
         
+class Base:
+    """
+    Base class for all methods.
+    Computes CLIP embeddings. If NEUTRAL_PROMPTS is not empty, then we take the difference between our prompts and the neutral prompt.
+    If EXP.GENERAL=False, then we compute the embeddings for each class (num_text_prompts, )
+    """
+    def __init__(self, text_prompts, model, cfg, neutral_prompts=[]):
+        # if cfg.AUGMENTATION.GENERIC:
+        #     print("using generic prompts")
+        #     assert type(text_prompts[0]) == list
+        # else:
+        #     assert type(text_prompts[0]) == str
+        self.class_names = DATASET_CLASSES[cfg.DATA.DATASET]
+        self.domain_names = DATASET_DOMAINS[cfg.DATA.DATASET]
+        self.target_prompts = text_prompts
+        self.cfg = cfg
+        self.model = model
+        self.neutral_prompts = neutral_prompts
+        source_embeddings, target_embeddings = get_domain_text_embs(self.model, cfg, self.neutral_prompts, self.target_prompts, self.class_names)
+        # target_embeddings is size (num_domains, num_classes, emb_size)
+        # source_embeddings is size (num_source_domain_descriptions, num_classes, emb_size)
+        if source_embeddings.shape[0] > 1:
+            self.text_embeddings = target_embeddings - source_embeddings.mean(axis=0)
+        else:
+            self.text_embeddings = target_embeddings - source_embeddings
+        # print(text_prompts, neutral_prompts)
+        # if self.cfg.AUGMENTATION.GENERIC:
+        #     self.text_embeddings = zeroshot_classifier(text_prompts, model, normalize=self.cfg.METHOD.NORMALIZE, model_type=self.cfg.EXP.IMAGE_FEATURES).cpu().numpy()
+        #     self.text_embeddings = np.transpose(self.text_embeddings, (1,0))
+        #     self.target_prompts = self.text_embeddings
+        #     if len(self.neutral_prompts) > 0:
+        #         self.neutral_embeddings = zeroshot_classifier(neutral_prompts, model, normalize=self.cfg.METHOD.NORMALIZE, model_type=self.cfg.EXP.IMAGE_FEATURES).cpu().numpy()
+        #         self.text_diffs = np.array([emb-self.neutral_embeddings[0] for emb in self.text_embeddings])
+        #         self.text_diffs = self.normalize(self.text_embeddings)
+        # else:
+        #     # go on a per class basis
+        #     templates = self.neutral_prompts + self.target_prompts
+        #     all_texts = []
+        #     for t in templates:
+        #         texts = [[t.format(c)] for c in self.class_names]
+        #         text_emb = self.normalize(zeroshot_classifier(texts, model, normalize=self.cfg.METHOD.NORMALIZE, model_type=self.cfg.EXP.IMAGE_FEATURES).cpu().numpy().T)
+        #         all_texts.append(text_emb)
+        #     # this subtracts the neutral embedding from the domain embeddings and normalizes. 
+        #     text_pairs = np.array(all_texts)
+        #     print("text pairs ", text_pairs.shape)
+        #     if len(self.neutral_prompts) > 0:
+        #         # self.neutral_embeddings = np.expand_dims(text_pairs[0], axis=0)
+        #         self.neutral_embeddings = text_pairs[:len(self.neutral_prompts)]
+        #         self.target_embeddings = text_pairs[1:] # (num_domains, num_classes, emb_size)
+        #         text_diffs = []
+        #         source_domain = text_pairs[0]
+        #         for target_domain in text_pairs[1:]:
+        #             diff = target_domain - source_domain
+        #             diff /= np.linalg.norm(diff, axis=-1, keepdims=True)
+        #             # diff = np.expand_dims(diff, axis=0)
+        #             text_diffs.append(diff)
+        #     else:
+        #         self.orig_prompts = text_pairs
+        #         text_diffs = text_pairs
+        #     self.text_embeddings = np.array(text_diffs).transpose((1, 0, 2)) # should be (num_classes, num_domains, emb_size)
+
+    @staticmethod
+    def compose_text_with_templates(text: str, templates=imagenet_templates) -> list:
+        return [template.format(text) for template in templates]
+
+    @staticmethod
+    def get_embedding(text_prompts, model):
+        text_inputs = torch.cat([clip.tokenize(t) for t in text_prompts]).cuda()
+        # Calculate features
+        with torch.no_grad():
+            text_features = model.encode_text(text_inputs)
+        return text_features.cpu().numpy()
+    
+    @staticmethod
+    def normalize(inputs):
+        # print("NORMALIZE BERFOR ", inputs.shape, np.linalg.norm(inputs, axis=-1, keepdims=True))
+        try:
+            inputs /= np.linalg.norm(inputs, axis=-1, keepdims=True)
+            # inputs /= np.linalg.norm(inputs, axis=0)
+        except:
+            print("NOMRALIZE ERROR ", inputs, np.linalg.norm(inputs, axis=-1, keepdims=True))
+        # print("NORMALIZE AFTER ", inputs.shape)
+        return inputs
+
+    def apply(self, inputs, labels=None):
+        if self.cfg.METHOD.NORMALIZE:
+            return self.normalize(inputs)
+        return inputs
+
 class EmbeddingDataset:
     """
     Takes in CLIP embeddings (INPUTS), labels, and CLIP text embedding (TEXT_EMB of shape (num_domains, clip emb shape)).
@@ -182,7 +271,7 @@ class EmbeddingDataset:
         #     return self.inputs[idx], self.labels[idx], self.groups[idx], torch.Tensor(soft_label)
         return self.inputs[idx], self.labels[idx], self.groups[idx], self.domain_labels[idx]
 
-class ClipMLP(Noop):
+class ClipMLP(Base):
 
     def __init__(self, text_prompts, model, cfg, neutral_prompts=[]):
         super().__init__(text_prompts, model, cfg, neutral_prompts)
@@ -617,7 +706,7 @@ class AugE2EMLPMulti(ClipMLP):
 
     def get_orig_text_embeddings(self, prompts):
         if self.cfg.AUGMENTATION.GENERIC:
-            text_embs = zeroshot_classifier(prompts, self.model, model_type=cfg.EXP.IMAGE_FEATURES).cpu().numpy().T
+            text_embs = zeroshot_classifier(prompts, self.model, model_type=self.cfg.EXP.IMAGE_FEATURES).cpu().numpy().T
             text_embs /= np.linalg.norm(text_embs, axis=-1, keepdims=True)
             return text_embs
         else:
@@ -625,7 +714,7 @@ class AugE2EMLPMulti(ClipMLP):
             for t in prompts:
                 texts = [[t.format(c)] for c in self.class_names]
                 text_names += texts
-                text_emb = zeroshot_classifier(texts, self.model, model_type=cfg.EXP.IMAGE_FEATURES).cpu().numpy().T
+                text_emb = zeroshot_classifier(texts, self.model, model_type=self.cfg.EXP.IMAGE_FEATURES).cpu().numpy().T
                 text_emb /= np.linalg.norm(text_emb, axis=-1, keepdims=True)
                 all_texts.append(text_emb)
             # print("array of orig prompts ", text_names, np.array(all_texts).transpose((1, 0, 2)).shape)

@@ -1,0 +1,38 @@
+EXP:
+  ADVICE_METHOD: "ClipMLP"
+  WANDB_SILENT: False
+  PROJ: "DomainNetMini_LADS_Replication"
+  SEED: 0
+  TEXT_PROMPTS: [['a realistic photo of a {}.'], ['a painting of a {}.'], ['clipart of a {}.']]
+  NEUTRAL_TEXT_PROMPTS: ['a sketch of a {}', 'a pencil drawing of a {}.', 'a drawing of a {}.']
+  AUGMENTATION: 'DirectionalMulti'
+  EPOCHS: 400
+  LOG_NN: True
+  ENSAMBLE: False
+  
+  
+DATA:
+  DATASET: "DomainNetMini"
+  LOAD_CACHED: True
+  SAVE_PATH: "vit14_clip.pth"
+  BATCH_SIZE: 256
+
+METHOD:
+  MODEL:
+    NUM_LAYERS: 1
+    DOM_WEIGHT: 1.0
+    LR: 0.0001
+    CHECKPOINT: 'checkpoint/mlp_simple.pth'
+    CHECKPOINT_NAME: 'DomainNetMini-mlp-directional'
+    RESUME: False
+  USE_DOM_GT: True
+  APPLY_TRANSFORMATION: False
+
+AUGMENTATION:
+  MODEL:
+    LR: 0.0001
+    WEIGHT_DECAY: 0.005
+    NUM_LAYERS: 1
+  EPOCHS: 50
+  GENERIC: False
+  ALPHA: 0.5

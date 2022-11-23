@@ -3,15 +3,6 @@ Official Implementation of LADS (Latent Augmentation using Domain descriptionS)
 
 ![LADS method overview.](figs/lads-method-2-1.png "LADS method overview")
 
-
-## TODO
-
-- [X] check ZS works 
-- [ ] finish readme
-- [ ] check everything works (I would be surprised if anything runs rn)
-- [ ] upload clip emb to gdrive to download
-- [ ] upload checkpoints
-
 ## Getting started
 
 1. Install the dependencies for our code using Conda. You may need to adjust the environment YAML file depending on your setup.
@@ -29,11 +20,13 @@ Official Implementation of LADS (Latent Augmentation using Domain descriptionS)
 The main results and checkpoints of LADS and other baselines can be accessed on wandb.  
 * Waterbirds: https://wandb.ai/clipinvariance/LADS_Waterbirds_Replication
 * ColoredMNIST: https://wandb.ai/clipinvariance/LADS_ColoredMNIST_Replication
+* CUB: https://wandb.ai/clipinvariance/LADS_CUBPainting_Replication 
+* miniDomainNet: https://wandb.ai/clipinvariance/LADS_miniDomainNet_Replication 
 
 ## Code Structure 
 The configurations for each method are in the `configs` folder. To try say the baseline of doing normal LR on the CLIP embeddings:
 ```
-python clip_advice.py --config configs/Waterbirds/Noop.yaml
+python clip_advice.py --config configs/Waterbirds/base.yaml
 ```
 
 Datasets supported are in the [helpers folder](./helpers/data_helpers.py). Currently they are:
@@ -41,6 +34,7 @@ Datasets supported are in the [helpers folder](./helpers/data_helpers.py). Curre
 * ColoredMNIST (LNTL version and simplified version)
 * DomainNet
 * CUB Paintings
+* OfficeHome
 
 You can download the CLIP embeddings of these datasets [here](https://drive.google.com/drive/folders/1ItjhX7RPfQ6fQQk6_bEYJPewnkVdcfOC?usp=sharing)
 
@@ -88,26 +82,13 @@ For example, to run LR on CLIP with a resnet50 backbone on ColoredMNIST, run
 python clip_advice.py --config configs/ColoredMNIST/mlp.yaml
 ```
 
-## Directional Loss
-The directional loss is an augmentation (so augment the training data and add it back in to the original). Its parameters are under the `AUGMENTATION` section of the config files. 
+**LR Initialized with the CLIP ZS Language Weights** For a small bump in OOD performance, you can run the `mlpzs.yaml` config to initalize the linear layer with the text embeddings of the classes. The prompts used are dictated by `EXP.TEMPLATES`, similar to running zero-shot.
 
-To make sure things are running correctly, run
-`python clip_advice.py --config configs/DomainNetMini/DirectionalAll.yaml`
-and check your results with https://wandb.ai/clipinvariance/CLIPInvariance_DomainNetMini/runs/1ctddl4j. 
+## Running LADS
+In LADS we train an augmentation network, augment the training data, then train a linear probe with the original and augmented data. Thus we use the same ADVICE_METHOD class and change the `EXP.AUGMENTATION` parameter to `LADS`. 
 
-## More examples
-Here are some more examples for each method:
+To make sure everything is working, run:
+`python clip_advice.py --config configs/CUB/lads.yaml`
+and check your results with https://wandb.ai/clipinvariance/LADS_CUBPainting_Replication/runs/ok37oz5h. 
 
-To train DANN on Waterbirds95:
-``` 
-python clip_advice.py --config configs/Waterbirds95/mlp.yaml DATA.DATASET=Waterbirds95 DATA.LOAD_CACHED=True MODEL.DOM_WEIGHT=0.001 MODEL.LR=0.001
-```
-
-To try [HardDebias](https://arxiv.org/pdf/1607.06520.pdf):
-```
-python clip_advice.py --config configs/ColoredMNIST/HardDebias.yaml
-```
-
-## Some Small things
-
-In order to reuse code, some of the arguments for MLPDebias are required in the yaml file for MLP (e.g. `METHOD.USE_DOM_GT`). You will get an error if you dont include these arguments in your yaml file but you can set them however you want if you are training the MLP baseline, they wont be used. 
+For the bias datasets, the augmentation class is called `BiasLADS`, and you can run the `lads.yaml` configs as well :)

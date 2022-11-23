@@ -9,9 +9,9 @@ EXP:
 DATA:
   DATASET: "DomainNetMini"
   BATCH_SIZE: 64
-  LOAD_CACHED: False
+  # LOAD_CACHED: False
   UPWEIGHT_CLASSES: True
-  SAVE_PATH: "data/DomainNetMini/save.pth"
+  # SAVE_PATH: "data/DomainNetMini/save.pth"
 
 METHOD:
   MODEL:

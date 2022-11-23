@@ -111,9 +111,8 @@ if len(prompts) >0 and type(prompts[0]) == omegaconf.listconfig.ListConfig:
 neutral_prompts = list(args.EXP.NEUTRAL_TEXT_PROMPTS)
 if len(neutral_prompts) >0 and type(neutral_prompts[0]) == omegaconf.listconfig.ListConfig:
     neutral_prompts = [list(p) for p in neutral_prompts]
+print("Advice Method", args.EXP.ADVICE_METHOD)
 bias_correction = getattr(CLIPTransformations, args.EXP.ADVICE_METHOD)(prompts, clip_model, args, neutral_prompts)
-if args.METHOD.APPLY_TRANSFORMATION:
-    transformation = getattr(CLIPTransformations, args.METHOD.APPLY_TRANSFORMATION)(prompts, clip_model, args, neutral_prompts)
 if args.DATA.LOAD_CACHED ==  False:
     trainset, valset, testset = dh.get_dataset(DATASET_NAME, preprocess, biased_val=args.EXP.BIASED_VAL)
     dataset_classes = dh.get_class(DATASET_NAME)
@@ -169,7 +168,7 @@ if args.EXP.ENSAMBLE:
 num_augmentations = 1
 if args.EXP.AUGMENTATION != None and args.EXP.AUGMENTATION != 'None':
     print("Augmenting training set...")
-    if "Directional" in args.EXP.AUGMENTATION:
+    if "LADS" in args.EXP.AUGMENTATION or 'Directional' in args.EXP.AUGMENTATION:
         augment = getattr(methods.augmentations, args.EXP.AUGMENTATION)(args, train_features, train_labels, train_groups, train_domains, train_filenames, bias_correction.text_embeddings, val_features, val_labels, val_groups, val_domains, val_filenames)
     else:
         augment = getattr(methods.augmentations, args.EXP.AUGMENTATION)(args, train_features, train_labels, train_groups, train_domains, train_filenames, bias_correction.text_embeddings)
@@ -204,18 +203,6 @@ if args.EXP.LOG_NN:
         wandb.sklearn.plot_confusion_matrix(sample_domains, neighbor_domains, dataset_domains)
         print("Plotted Nearest Neighbors")
 
-if args.METHOD.APPLY_TRANSFORMATION:
-    # apply 'advice' module
-    if args.AUGMENTATION.GENERIC:
-        train_features = transformation.apply(train_features)
-    else:
-        train_features = transformation.apply(train_features, train_labels)
-    old_val_features, old_val_labels, old_val_groups, old_val_domains, old_val_filenames = val_features, val_labels, val_groups, val_domains, val_filenames
-    old_test_features, old_test_labels, old_test_groups, old_test_domains, old_test_filenames = test_features, test_labels, test_groups, test_domains, test_filenames
-    if args.EXP.TRANSFORM_TEST:
-        val_features = transformation.apply(val_features)
-        test_features = transformation.apply(test_features)
-
 # train MLP with domain adaptation loss
 bias_correction.train_debias(train_features, train_labels, train_groups, train_domains, val_features, val_labels, np.squeeze(val_groups), val_domains)
 if args.EXP.ENSAMBLE:
@@ -226,37 +213,30 @@ if args.EXP.ENSAMBLE:
     accuracy, balanced_acc, class_accuracy, group_accuracy = evaluate(ensamble_predictions, val_labels, np.squeeze(val_groups), num_augmentations=num_augmentations)
     wandb.summary["ensamble val acc"] = accuracy
     wandb.summary["ensamble val blanced acc"] = balanced_acc
-    accuracy, balanced_acc, class_accuracy, group_accuracy = evaluate(combined_preds, val_labels, np.squeeze(val_groups), num_augmentations=num_augmentations)
-    wandb.summary["ensamble triage val acc"] = accuracy
-    wandb.summary["ensamble triage val blanced acc"] = balanced_acc
 
     predictions, probs = bias_correction.eval(test_features, ret_probs=True)
     lads_preds, zs_preds, ensamble_predictions, combined_preds = get_ensamble_preds(test_features, probs, zeroshot_weights, dataset_domains=dom_zeroshot_weights)
     non_overlap, non_overlap_prop, non_overlap_prop_correct = get_pred_overlap(lads_preds, zs_preds, test_labels)
     accuracy, balanced_acc, class_accuracy, group_accuracy = evaluate(ensamble_predictions, test_labels, np.squeeze(test_groups), num_augmentations=num_augmentations)
     _, _, _, domain_accuracy = evaluate(ensamble_predictions, test_labels, np.squeeze(test_domains), list(range(len(dataset_classes))), num_augmentations=num_augmentations)
-    # group_acc = group_accuracy.reshape(len(dataset_classes), int(len(group_accuracy)/len(dataset_classes)))
     wandb.summary["ensamble test acc"] = accuracy
     wandb.summary["ensamble test blanced acc"] = balanced_acc
     wandb.summary["ensamble test class acc"] = class_accuracy
     wandb.summary["ensamble test domain acc"] = domain_accuracy
     wandb.summary["ensamble test worst domain acc"] = np.min(domain_accuracy)
-    wandb.summary['ensamble test group acc'] = group_accuracy
-
-    ccuracy, balanced_acc, class_accuracy, group_accuracy = evaluate(combined_preds, test_labels, np.squeeze(test_groups), num_augmentations=num_augmentations)
-    _, _, _, domain_accuracy = evaluate(combined_preds, test_labels, np.squeeze(test_domains), list(range(len(dataset_classes))), num_augmentations=num_augmentations)
-    # group_acc = group_accuracy.reshape(len(dataset_classes), int(len(group_accuracy)/len(dataset_classes)))
-    wandb.summary["ensamble triage test acc"] = accuracy
-    wandb.summary["ensamble triage test blanced acc"] = balanced_acc
-    wandb.summary["ensamble triage test domain acc"] = domain_accuracy
-
-    wandb.summary["LADS correct over ZS"] = non_overlap
-    wandb.summary["LADS correct prop over ZS"] = non_overlap_prop
-    wandb.summary['LADS correct frac correct over ZS'] = non_overlap_prop_correct   
+    wandb.summary['ensamble test group acc'] = group_accuracy   
 else:
     predictions, probs = bias_correction.eval(test_features)
+val_predictions, val_probs = bias_correction.eval(val_features)
+val_accuracy, val_balanced_acc, val_class_accuracy, val_group_accuracy = evaluate(val_predictions, val_labels, np.squeeze(val_groups), num_augmentations=num_augmentations)
 accuracy, balanced_acc, class_accuracy, group_accuracy = evaluate(predictions, test_labels, np.squeeze(test_groups), num_augmentations=num_augmentations)
 _, _, _, domain_accuracy = evaluate(predictions, test_labels, np.squeeze(test_domains), list(range(len(dataset_classes))), num_augmentations=num_augmentations)
+print("RIGHT BEFORE WANDB LOGGING")
+# # per domain acc
+# for d in range(len(dataset_domains)):
+#     dom_accuracy, dom_balanced_acc, dom_class_accuracy, dom_group_accuracy = evaluate(predictions[test_groups == d], test_labels[test_groups == d], test_groups[test_groups == d])
+#     for i in range(len(dataset_classes)):
+#         wandb.summary[f"{dataset_classes[i]} {dataset_domains[d]} test acc"] = dom_class_accuracy[i]
 # group_acc = group_accuracy.reshape(len(dataset_classes), int(len(group_accuracy)/len(dataset_classes)))
 wandb.summary["test acc"] = accuracy
 wandb.summary["test blanced acc"] = balanced_acc
@@ -267,4 +247,7 @@ wandb.summary['test group acc'] = group_accuracy
 for i in range(len(domain_accuracy)):
     wandb.summary[f"{dataset_domains[i]} test acc"] = domain_accuracy[i]
 for i in range(len(dataset_classes)):
-        wandb.summary[f"{dataset_classes[i]} test acc"] = class_accuracy[i]
+    wandb.summary[f"{dataset_classes[i]} test acc"] = class_accuracy[i]
+    wandb.summary[f"{dataset_classes[i]} val acc"] = val_class_accuracy[i]
+print(f"Test accuracy: {group_accuracy} \n Test domain accuracy: {domain_accuracy}")
+print("RIGHT AFTER WANDB LOGGING")

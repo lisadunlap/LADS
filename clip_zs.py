@@ -181,12 +181,21 @@ _, _, _, domain_accuracy = CLIPTransformations.evaluate(preds, labels, np.squeez
 wandb.summary["val acc"] = accuracy
 wandb.summary["best val balanced acc"] = balanced_acc
 wandb.summary["val class acc"] = class_accuracy
+for i in range(len(dataset_classes)):
+    wandb.summary[f"{dataset_classes[i]} val acc"] = class_accuracy[i]
 
 #test set
 preds, labels, groups = eval(test_loader)
 accuracy, balanced_acc, class_accuracy, group_accuracy = CLIPTransformations.evaluate(preds, labels, groups)
 # group_acc = group_accuracy.reshape(len(dataset_classes), max([int(len(group_accuracy)/len(dataset_classes)), 1]))
 _, _, _, domain_accuracy = CLIPTransformations.evaluate(preds, test_labels, np.squeeze(test_domains), list(range(len(dataset_classes))))
+
+# per domain acc
+for d in range(len(dataset_domains)):
+    dom_accuracy, dom_balanced_acc, dom_class_accuracy, dom_group_accuracy = CLIPTransformations.evaluate(preds[groups == d], labels[groups == d], groups[groups == d])
+    for i in range(len(dataset_classes)):
+        wandb.summary[f"{dataset_classes[i]} {dataset_domains[d]} test acc"] = dom_class_accuracy[i]
+
 print(f"unique test domains {np.unique(test_domains)}")
 wandb.summary["test acc"] = accuracy
 wandb.summary["test blanced acc"] = balanced_acc

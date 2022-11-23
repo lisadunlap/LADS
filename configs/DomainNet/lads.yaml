@@ -1,14 +1,13 @@
 EXP:
-  ADVICE_METHOD: "ClipMLP"
+  ADVICE_METHOD: "ClipMLPNew"
   WANDB_SILENT: False
   PROJ: "DomainNetMini_LADS_Replication"
   SEED: 0
-  # TEXT_PROMPTS: [["clipart"], ["painting"], ["real photo"]]
-  # TEXT_PROMPTS: [['painting']]
-  TEXT_PROMPTS: ['a realistic photo of a {}', 'a painting of a {}', 'clipart of a {}']
-  NEUTRAL_TEXT_PROMPTS: ['a sketch of a {}']
-  AUGMENTATION: 'Directional'
+  TEXT_PROMPTS: [['a realistic photo of a {}'], ['a painting of a {}'], ['clipart of a {}']]
+  NEUTRAL_TEXT_PROMPTS: ['a sketch of a {}', 'a pencil drawing of a {}.', 'a drawing of a {}.'] # you can also just use one prompt
+  AUGMENTATION: 'LADS'
   EPOCHS: 400
+  ENSAMBLE: False
   LOG_NN: True
   
   
@@ -20,7 +19,7 @@ DATA:
 
 METHOD:
   MODEL:
-    NUM_LAYERS: 2
+    NUM_LAYERS: 1
     DOM_WEIGHT: 1.0
     LR: 0.0001
     CHECKPOINT: 'checkpoint/mlp_simple.pth'
@@ -36,3 +35,4 @@ AUGMENTATION:
   EPOCHS: 50
   GENERIC: False
   ALPHA: 0.5
+  DOM_LABELS: ['real', 'painting', 'clipart']

@@ -1,13 +1,13 @@
 EXP:
-  ADVICE_METHOD: "ClipMLP"
+  ADVICE_METHOD: "ClipMLPNew"
   WANDB_SILENT: False
   PROJ: "DomainNetMini_LADS_Replication"
   SEED: 0
-  TEXT_PROMPTS: [['a realistic photo of a {}.'], ['a painting of a {}.'], ['clipart of a {}.']]
+  TEXT_PROMPTS: [['a realistic photo of a {}.'], ['a painting of a {}.'], ['clipart of a {}.'], ['art of a {}.'], ['an image of a {}.']]
   NEUTRAL_TEXT_PROMPTS: ['a sketch of a {}', 'a pencil drawing of a {}.', 'a drawing of a {}.']
   AUGMENTATION: 'DirectionalMulti'
   EPOCHS: 400
-  LOG_NN: True
+  LOG_NN: False
   ENSAMBLE: False
   
   
@@ -36,3 +36,4 @@ AUGMENTATION:
   EPOCHS: 50
   GENERIC: False
   ALPHA: 0.5
+  DOM_LABELS: ['real', 'painting', 'clipart', 'painting', 'real']

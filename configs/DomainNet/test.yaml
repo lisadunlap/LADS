@@ -1,0 +1,22 @@
+EXP:
+  ADVICE_METHOD: "Base"
+  WANDB_SILENT: False
+  PROJ: "DomainNetMini_LADS_Replication"
+  SEED: 0
+  TEXT_PROMPTS: ['clipart of a {}.', 'a painting of a {}.', 'a realistic photo of a {}.']
+  NEUTRAL_TEXT_PROMPTS: ['a sketch of a {}']
+  EPOCHS: 400
+
+DATA:
+  DATASET: "DomainNetMini"
+  BATCH_SIZE: 256
+
+METHOD:
+  MODEL:
+    NUM_LAYERS: 1
+    DOM_WEIGHT: 1.0
+    LR: 0.0001
+    CHECKPOINT: 'checkpoint/mlp.pth'
+    CHECKPOINT_NAME: 'DomainNetMini/mlp'
+    RESUME: False
+  USE_DOM_GT: False

@@ -150,6 +150,14 @@ def get_dataset(dataset_name, transform, val_transform=None, biased_val=True):
         trainset = OfficeHome('/shared/lisabdunlap/data', domains=["Product"], train=True, transform=transform)
         valset = OfficeHome('/shared/lisabdunlap/data', domains=["Product"], train=False, transform=transform)
         testset = OfficeHome('/shared/lisabdunlap/data', domains=["Art", "Clipart", "Real World"],train=True, transform=transform)
+    elif dataset_name == "OfficeHomeClipart":
+        trainset = OfficeHome('/shared/lisabdunlap/data', domains=["Clipart"], train=True, transform=transform)
+        valset = OfficeHome('/shared/lisabdunlap/data', domains=["Clipart"], train=False, transform=transform)
+        testset = OfficeHome('/shared/lisabdunlap/data', domains=["Product", "Art", "Real World"],train=True, transform=transform)
+    elif dataset_name == "OfficeHomeArt":
+        trainset = OfficeHome('/shared/lisabdunlap/data', domains=["Art"], train=True, transform=transform)
+        valset = OfficeHome('/shared/lisabdunlap/data', domains=["Art"], train=False, transform=transform)
+        testset = OfficeHome('/shared/lisabdunlap/data', domains=["Clipart", "Product", "Real World"],train=True, transform=transform)
     else:
         raise ValueError(f"{dataset_name} Dataset not supported")
 
@@ -171,12 +179,14 @@ DATASET_CLASSES = {
     "DomainNetMiniOracle": MINI_DOMAINNET_CLASSES,
     "CUB": CUB_CLASSES,
     "OfficeHomeProduct": OFFICE_HOME_CLASSES,
+    "OfficeHomeClipart": OFFICE_HOME_CLASSES,
+    "OfficeHomeArt": OFFICE_HOME_CLASSES,
     "GroZi": GROZI_CLASSES,
 }
 
 DATASET_DOMAINS = {
-    "Waterbirds": ['land', 'water'],
-    "Waterbirds95": ['land', 'water'],
+    "Waterbirds": ['forest', 'water'],
+    "Waterbirds95": ['forest', 'water'],
     "ColoredMNISTBinary": ['red', 'blue'],
     "ColoredMNISTQuinque": ['red','green','yellow','pink','blue'],
     "DomainNet": ['photo', 'sketch'],
@@ -187,6 +197,8 @@ DATASET_DOMAINS = {
     "SVHN": ["MNIST", "SVHN"],
     "MNIST_SVHN": ["MNIST", "SVHN"],
     "OfficeHomeProduct": OFFICE_HOME_DOMAINS,
+    "OfficeHomeClipart": OFFICE_HOME_DOMAINS,
+    "OfficeHomeArt": OFFICE_HOME_DOMAINS,
     "GroZi": GROZI_DOMAINS,
 }
 

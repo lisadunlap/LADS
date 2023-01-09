@@ -1,7 +1,9 @@
 # LADS
-Official Implementation of LADS (Latent Augmentation using Domain descriptionS)
+Official Implementation of [LADS (Latent Augmentation using Domain descriptionS)](https://lisadunlap.github.io/LADS-website)
 
 ![LADS method overview.](figs/lads-method-2-1.png "LADS method overview")
+
+*WARNING: this is still WIP, please raise an issue if you run into any bugs.*
 
 ## Getting started
 
@@ -45,19 +47,22 @@ Then, add the path to the saved embeddings to DATASET_PATHS in [data_helpers](./
 More description of each method and the config files in the config folder. 
 
 ## Some important parameters
-**EXP.TEXT_PROMPTS**
-
+<details><summary>EXP.TEXT_PROMPTS</summary>
 This is the domains/biases that you want to be invariant to. You can either have them be class specific (e.g. `["a painting of a {}.", "clipart of a {}."]`) or generic (e.g. `[["painting"], ["clipart"]]`). The default is class specific so if you want to use generic prompts instead set `AUGMENTATION.GENERIC=True`. For generic prompts, if you want to average the text embeddings of several phrases of a domain, simply add them to the list (e.g. `[["painting", "a photo of a painting", "an image of a painting"], ["clipart", "clipart of an object"]]`).
+</details>
 
-**EXP.NEUTRAL_PROMPTS**
 
+<details><summary>EXP.NEUTRAL_PROMPTS</summary>
 If you want to take the difference in text embeddings (for things like the directional loss, most of the augmentations, and the embedding debiasing methods). you can set a neutral prompt (e.g. `["a sketch of a {}."]` or `[["a photo of a sketch]]`). Like TEXT_PROMPTS you can have it be class specific or generic, but if TEXT_PROMPTS is class specific so is NEUTRAL_PROMPTS and vice versa.
+</details>
 
-**EXP.ADVICE_METHOD**
 
+<details><summary>EXP.ADVICE_METHOD</summary>
 This sets the type of linear probing you are doing. Set to `LR` if you want to use the scikit learn LR (what is in the CLIP repo) or `ClipMLP` for pytorch MLP (if `METHOD.MODEL.NUM_LAYERS=1` this is LR). Typically `CLIPMLP` runs a lot faster than `LR`.
 
 You can also set the advice method to one of the debiasing methods (different from augmentations in that we augment the training data and dont add in the original training data), but we don't use them anymore and I'm too lazy to explain it so if you care to try them out check the configs file (WARNING these are old so high chance of bugs).
+</details>
+
 
 ## Running CLIP Zero-Shot
 In order to run the CLIP zero-shot baseline, set `EXP.ADVICE_METHOD=CLIPZS` and run the `clip_zs.py` file instead of `main.py` file. 

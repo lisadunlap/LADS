@@ -1,0 +1,21 @@
+EXP:
+  ADVICE_METHOD: "CLIPZS"
+  WANDB_SILENT: False
+  PROJ: "LADS_OfficeHomeReal"
+  SEED: 0
+  TEXT_PROMPTS: []
+  # TEMPLATES: 'no_template'
+  TEMPLATES: 'office_home_templates'
+  
+DATA:
+  DATASET: "OfficeHomeClipart"
+  BATCH_SIZE: 256
+  LOAD_CACHED: True
+  UPWEIGHT_CLASSES: True
+
+METHOD:
+  MODEL:
+    NUM_LAYERS: 1
+    SEPERATE_CLASSES: True
+    RESUME: True
+  NORMALIZE: True

@@ -4,8 +4,8 @@ EXP:
   PROJ: "LADS_Waterbirds_Rebuttal"
   SEED: 0
   TEXT_PROMPTS: [['a photo of a {} on forest.'], ['a photo of a {} on water.']]
-  NEUTRAL_TEXT_PROMPTS: []
-  AUGMENTATION: 'BiasDirectional'
+  NEUTRAL_TEXT_PROMPTS: ['a photo of a {} on forest.', 'a photo of a {} on water.']
+  AUGMENTATION: 'LADSBias'
   EPOCHS: 200
   CHECKPOINT_VAL: True
   ENSAMBLE: False
@@ -36,10 +36,10 @@ AUGMENTATION:
   EPOCHS: 50
   GENERIC: False
   DOM_LABELS: ["forest", "water"]
-  DOM_SPECIFIC_XE: False
+  # DOM_SPECIFIC_XE: False
   ALPHA: 0.75
   CLIP_NN_LOSS: True
   COMPARE_BEFORE_AUG: True
   NN_INCLUDE_SAMPLE: True
-  DOM_WEIGHT: 1.0
+  # DOM_WEIGHT: 1.0
   NN_WEIGHT: 1.0

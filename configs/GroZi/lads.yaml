@@ -8,7 +8,6 @@ EXP:
   NEUTRAL_TEXT_PROMPTS: ['a stock photo of {}.']
   AUGMENTATION: 'Directional'
   EPOCHS: 200
-  LOG_HIST: True
   ENSAMBLE: True
   
   

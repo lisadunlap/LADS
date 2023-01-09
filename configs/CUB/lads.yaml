@@ -1,5 +1,5 @@
 EXP:
-  ADVICE_METHOD: "ClipMLPNew"
+  ADVICE_METHOD: "ClipMLP"
   WANDB_SILENT: False
   PROJ: "LADS_CUB_Replication"
   SEED: 0

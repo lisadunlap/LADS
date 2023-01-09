@@ -26,7 +26,6 @@ METHOD:
     CHECKPOINT_NAME: 'DomainNetMini-mlp-directional'
     RESUME: False
   USE_DOM_GT: True
-  APPLY_TRANSFORMATION: False
 
 AUGMENTATION:
   MODEL:

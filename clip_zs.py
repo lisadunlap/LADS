@@ -38,7 +38,7 @@ if len(unknown) > 0:
     args = OmegaConf.merge(args, to_merge)
 args.yaml = flags.config
 
-assert args.EXP.ADVICE_METHOD == 'CLIPZS', "clip_zs.py only for CLIPZS baseline, use train.py or clip_advice.py"
+assert args.EXP.ADVICE_METHOD == 'CLIPZS', "clip_zs.py only for CLIPZS baseline, use train.py or main.py"
 
 if args.EXP.WANDB_SILENT:
     os.environ['WANDB_SILENT']="true"
@@ -57,7 +57,7 @@ def flatten_config(dic, running_key=None, flattened_dict={}):
 
 run = wandb.init(project=args.EXP.PROJ, group=args.EXP.ADVICE_METHOD, config=flatten_config(args), entity="clipinvariance")
 wandb.save(flags.config)
-wandb.run.log_code(".")
+# wandb.run.log_code(".")
 
 torch.manual_seed(args.EXP.SEED)
 np.random.seed(args.EXP.SEED)
@@ -191,10 +191,10 @@ accuracy, balanced_acc, class_accuracy, group_accuracy = CLIPTransformations.eva
 _, _, _, domain_accuracy = CLIPTransformations.evaluate(preds, test_labels, np.squeeze(test_domains), list(range(len(dataset_classes))))
 
 # per domain acc
-for d in range(len(dataset_domains)):
-    dom_accuracy, dom_balanced_acc, dom_class_accuracy, dom_group_accuracy = CLIPTransformations.evaluate(preds[groups == d], labels[groups == d], groups[groups == d])
-    for i in range(len(dataset_classes)):
-        wandb.summary[f"{dataset_classes[i]} {dataset_domains[d]} test acc"] = dom_class_accuracy[i]
+# for d in range(len(dataset_domains)):
+#     dom_accuracy, dom_balanced_acc, dom_class_accuracy, dom_group_accuracy = CLIPTransformations.evaluate(preds[groups == d], labels[groups == d], groups[groups == d])
+#     for i in range(len(dataset_classes)):
+#         wandb.summary[f"{dataset_classes[i]} {dataset_domains[d]} test acc"] = dom_class_accuracy[i]
 
 print(f"unique test domains {np.unique(test_domains)}")
 wandb.summary["test acc"] = accuracy
@@ -205,5 +205,5 @@ wandb.summary["test worst domain acc"] = np.min(domain_accuracy)
 wandb.summary['test group acc'] = group_accuracy
 for i in range(len(domain_accuracy)):
             wandb.summary[f"{dataset_domains[i]} test acc"] = domain_accuracy[i]
-for i in range(len(dataset_classes)):
-            wandb.summary[f"{dataset_classes[i]} test acc"] = class_accuracy[i]
+# for i in range(len(dataset_classes)):
+#             wandb.summary[f"{dataset_classes[i]} test acc"] = class_accuracy[i]

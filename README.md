@@ -26,7 +26,7 @@ The main results and checkpoints of LADS and other baselines can be accessed on 
 ## Code Structure 
 The configurations for each method are in the `configs` folder. To try say the baseline of doing normal LR on the CLIP embeddings:
 ```
-python clip_advice.py --config configs/Waterbirds/base.yaml
+python main.py --config configs/Waterbirds/base.yaml
 ```
 
 Datasets supported are in the [helpers folder](./helpers/data_helpers.py). Currently they are:
@@ -60,7 +60,7 @@ This sets the type of linear probing you are doing. Set to `LR` if you want to u
 You can also set the advice method to one of the debiasing methods (different from augmentations in that we augment the training data and dont add in the original training data), but we don't use them anymore and I'm too lazy to explain it so if you care to try them out check the configs file (WARNING these are old so high chance of bugs).
 
 ## Running CLIP Zero-Shot
-In order to run the CLIP zero-shot baseline, set `EXP.ADVICE_METHOD=CLIPZS` and run the `clip_zs.py` file instead of `clip_advice.py` file. 
+In order to run the CLIP zero-shot baseline, set `EXP.ADVICE_METHOD=CLIPZS` and run the `clip_zs.py` file instead of `main.py` file. 
 
 For example
 ```
@@ -79,7 +79,7 @@ Note: you do need to save the embeddings for each model in the `helpers/dataset_
 
 For example, to run LR on CLIP with a resnet50 backbone on ColoredMNIST, run
 ```
-python clip_advice.py --config configs/ColoredMNIST/mlp.yaml
+python main.py --config configs/ColoredMNIST/mlp.yaml
 ```
 
 **LR Initialized with the CLIP ZS Language Weights** For a small bump in OOD performance, you can run the `mlpzs.yaml` config to initalize the linear layer with the text embeddings of the classes. The prompts used are dictated by `EXP.TEMPLATES`, similar to running zero-shot.
@@ -88,7 +88,7 @@ python clip_advice.py --config configs/ColoredMNIST/mlp.yaml
 In LADS we train an augmentation network, augment the training data, then train a linear probe with the original and augmented data. Thus we use the same ADVICE_METHOD class and change the `EXP.AUGMENTATION` parameter to `LADS`. 
 
 To make sure everything is working, run:
-`python clip_advice.py --config configs/CUB/lads.yaml`
+`python main.py --config configs/CUB/lads.yaml`
 and check your results with https://wandb.ai/clipinvariance/LADS_CUBPainting_Replication/runs/ok37oz5h. 
 
 For the bias datasets, the augmentation class is called `BiasLADS`, and you can run the `lads.yaml` configs as well :)

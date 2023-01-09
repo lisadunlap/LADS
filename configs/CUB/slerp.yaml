@@ -7,6 +7,7 @@ EXP:
   NEUTRAL_TEXT_PROMPTS: ['a photo of a {} bird.']
   EPOCHS: 400
   CHECKPOINT_VAL: True
+  AUGMENTATION: SLERP
 
 DATA:
   DATASET: "CUB"

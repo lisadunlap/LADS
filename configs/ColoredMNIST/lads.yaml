@@ -3,10 +3,9 @@ EXP:
   WANDB_SILENT: False
   PROJ: "ColoredMNIST_ViT_Final"
   SEED: 0
-  TEXT_PROMPTS: [['a photo of a red number.'], ['a photo of a blue number.']]
+  TEXT_PROMPTS: [['a photo of a red number {}.'], ['a photo of a blue number {}.']]
   AUGMENTATION: 'BiasDirectional'
   EPOCHS: 200
-  LOG_HIST: True
   CHECKPOINT_VAL: True
   ENSAMBLE: False
 
@@ -36,7 +35,7 @@ AUGMENTATION:
     HIDDEN_DIM: 512
   ALPHA: 1
   EPOCHS: 50
-  GENERIC: True
+  GENERIC: False
   DOM_SPECIFIC_XE: False
   CLIP_NN_LOSS: True
   NN_WEIGHT: 0.1

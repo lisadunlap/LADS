@@ -1,0 +1,32 @@
+EXP:
+  ADVICE_METHOD: "ClipMLP"
+  WANDB_SILENT: False
+  PROJ: "LADS_OfficeHomeArt"
+  SEED: 0
+  TEXT_PROMPTS: ['clipart of a {}.', 'a stock photo of a {}.', 'a photo of a {}.']
+  NEUTRAL_TEXT_PROMPTS: ['art of a {}.']
+  AUGMENTATION: 'Directional'
+  EPOCHS: 200
+  LOG_NN: True
+  
+  
+DATA:
+  DATASET: "OfficeHomeArt"
+  BATCH_SIZE: 256
+
+METHOD:
+  MODEL:
+    NUM_LAYERS: 1
+    LR: 0.005
+    WEIGHT_DECAY: 0.05
+    CHECKPOINT_NAME: 'cub_lp'
+
+AUGMENTATION:
+  MODEL:
+    LR: 0.001
+    WEIGHT_DECAY: 0.005
+    NUM_LAYERS: 1
+  EPOCHS: 50
+  GENERIC: False
+  ALPHA: 0.5
+  DOM_LABELS: ['Clipart', 'Product', 'Real World']

@@ -1,77 +1,61 @@
-SEED: 0
-
+EXP:
+  ADVICE_METHOD: "Base"
+  WANDB_SILENT: False
+  PROJ: "LADS"
+  SEED: 0
+  TEXT_PROMPTS: ["a photo of a {}."]
+  NEUTRAL_TEXT_PROMPTS: []
+  TEMPLATES: "no_template"
+  CHECKPOINT_VAL: True
+  LOG_NN: True
+  CLIP_MODEL: 'ViT-L/14'
+  IMAGE_FEATURES: 'clip'
+  AUGMENTATION: None
+  ENSAMBLE: True
+  CLIP_PRETRAINED_DATASET: 'openai'
+  BIASED_VAL: True
 
 DATA:
-  BATCH_SIZE: 128
-  NUM_WORKERS: 4
+  DATASET: "Waterbirds95"
+  BATCH_SIZE: 256
+  LOAD_CACHED: True
+  SAVE_PATH: 'data/waterbirds/em.pth'
+  UPWEIGHT_DOMAINS: False
+  UPWEIGHT_CLASSES: True
+  MODEL_DIM: 1024
 
-  # Size of training images (square)
-  SIZE: 224
+METHOD:
+  MODEL:
+    WEAK_LABELS: False 
+    NUM_LAYERS: 1
+    LR: 0.001
+    SEPERATE_CLASSES: True
+    RESUME: False
+    CHECKPOINT: './checkpoint/mlp_test.sav'
+    CHECKPOINT_NAME: 'ColoredMNISTSimple/mlp'
+    WEIGHT_DECAY: 0.05
+    HIDDEN_DIM: 384
+  NORMALIZE: True
+  USE_DOM_GT: False
+  NORMALIZE_OUTPUT: True
 
-  # Mean and std deviation to use, found in datasets/__init__.py
-  NORMALIZATION: 'imagenet'
-
-  ATTENTION_DIR: "NONE"
-  USE_GROUP_WEIGHTS: False
-  SEPARATE_CLASSES: True
-
-  BALANCE_AVERAGE_MODE: "mean" # mean, harmonic_mean
-
-  REMOVE_BACKGROUND: False
-  MASK_PIXELS: False
-  ROOT: "/shared/lisabdunlap/vl-attention/data"
-
-EXP:
-  FREEZE_BACKBONE: False
-  BIAS_DETECTION: False
-  SAL_LAYER: 'layer4.2.relu'
-  LOG_GCAMS: True
-  ATTN_PER_CLASS: False
-
-  LOSSES:
-    CLASSIFICATION:
-      WEIGHT: 1
-    GRADIENT_OUTSIDE:
-      COMPUTE: False
-      LOG: False
-      WEIGHT: 0.01
-      CRITERION: "L1"
-      GT: "segmentation"
-      COMBINE_ATT_MODE: "average_nonzero"
-    GRADIENT_INSIDE:
-      COMPUTE: False
-      LOG: False
-      WEIGHT: 1
-      CRITERION: "L1"
-      GT: "segmentation"
-      COMBINE_ATT_MODE: "average_nonzero"
-    GRADCAM:
-      COMPUTE: False
-      LOG: False
-      WEIGHT: 1
-      CRITERION: "L1"
-      GT: "segmentation"
-      MODE: "match" # match, suppress_outside
-      COMBINE_ATT_MODE: "average_nonzero"
-
-LOGGING:
-  # save model every save_every # of epochs. if 0, don't save model on a regular basis
-  SAVE_EVERY: 0
-
-  # save best model (updates throughout training)
-  SAVE_BEST: True
-
-  # save last model (updates throughout training)
-  SAVE_LAST: False
-
-  # Logging attention.
-  # Step is # epochs b/w logging. Would also log attention before training and at end.
-  LOG_ATTENTION: False
-  LOG_ATTENTION_STEP: 10
-
-  SAVE_CONFUSION_MATRIX: False
-  SAVE_CONFUSION_MATRIX_PATH: "NONE"
-
-  # Save stats over multiple runs to a CSV file.
-  # Gathering stats over multiple trials can also be done by setting EXP.NUM_TRIALS.
-  SAVE_STATS_PATH: "NONE"
+AUGMENTATION:
+  MODEL:
+    LR: 0.005
+    WEIGHT_DECAY: 0.05
+    HIDDEN_DIM: 384
+    NUM_LAYERS: 2
+  LOSS_TYPE: 'cosine'
+  EPOCHS: 50
+  GENERIC: False
+  ALPHA: 0.5
+  INCLUDE_ORIG_TRAINING: True
+  TEST_TIME_AUG: False
+  CLIP_NN_LOSS: False
+  NN_CLASS_SPECIFIC: False
+  COMPARE_BEFORE_AUG: True
+  NN_INCLUDE_SAMPLE: True
+  DOM_WEIGHT: 1.0
+  DOM_SPECIFIC_XE: False
+  DOM_LABELS: []
+  NN_WEIGHT: 0.0

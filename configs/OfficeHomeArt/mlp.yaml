@@ -1,0 +1,20 @@
+EXP:
+  ADVICE_METHOD: "ClipMLP"
+  WANDB_SILENT: False
+  PROJ: "LADS_OfficeHomeArt"
+  SEED: 0
+  TEXT_PROMPTS: ['art of a {}.', 'a stock photo of a {}.', 'a photo of a {}.']
+  NEUTRAL_TEXT_PROMPTS: ['clipart of a {}.']
+  EPOCHS: 200
+  CHECKPOINT_VAL: True
+
+DATA:
+  DATASET: "OfficeHomeArt"
+  BATCH_SIZE: 256
+
+METHOD:
+  MODEL:
+    NUM_LAYERS: 1
+    LR: 0.005
+    WEIGHT_DECAY: 0.05
+    CHECKPOINT_NAME: 'cub_lp'

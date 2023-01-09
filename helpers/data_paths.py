@@ -29,10 +29,12 @@ DATASET_PATHS = {
                 },
         "ViT-L/14": {
                 "CUB": "data/cub/vit14_clip.pth",
-                "DomainNetMini": "data/DomainNetMini/save.pth",
+                "DomainNetMini": "data/domainnet/vit14_clip.pth",
                 "MNIST_SVHN": "data/SVHN/vit14_clip.pth",
                 "Waterbirds": "data/waterbirds/vit14_clip.pth",
-                "ColoredMNISTBinary": "data/ColoredMNIST/binary_vit14.pth"
+                "ColoredMNISTBinary": "data/ColoredMNIST/binary_vit14.pth",
+                "OfficeHomeProduct": "data/OfficeHome/product_vit14.pth",
+                "GroZi": "data/GroZi/vit14.pth",
                 },
     },
     "openclip":{

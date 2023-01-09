@@ -5,6 +5,10 @@ cub_template = ['a photo of a {} bird.', 'a painting of a {} bird.']
 # cub_template = ['a photo of a {}.', 'a painting of a {}.']
 only_class = ['{}']
 
+grozi_templates  = ['an in vitro photo of {}.', 'an in situ photo of {}.']
+
+office_home_templates = ['a stock photo of a {}.', 'art of a {}.', 'a photo of a {}.', 'clipart of a {}.']
+
 mnist_templates = ['a photo of the number: "{}".',]
 
 svhn_templates = ['a street sign of the number: "{}".',]

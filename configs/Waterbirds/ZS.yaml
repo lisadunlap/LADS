@@ -1,7 +1,7 @@
 EXP:
   ADVICE_METHOD: "CLIPZS"
   WANDB_SILENT: False
-  PROJ: "Waterbirds_ViT14"
+  PROJ: "LADS_Waterbirds_Rebuttal"
   SEED: 0
   TEXT_PROMPTS: ['landbird', 'waterbird']
   # TEMPLATES: 'no_template'

@@ -1,12 +1,12 @@
 EXP:
-  ADVICE_METHOD: "ClipMLP"
+  ADVICE_METHOD: "ClipMLPZS"
   WANDB_SILENT: False
   PROJ: "LADS_Waterbirds_Rebuttal"
   SEED: 0
   TEXT_PROMPTS: ['a photo of a {} on forest.', 'a photo of a {} on water.']
   NEUTRAL_TEXT_PROMPTS: ['a photo of a {}.']
   EPOCHS: 200
-  BIASED_VAL: 
+  TEMPLATES: 'waterbirds_templates2'
 
 DATA:
   DATASET: "Waterbirds"

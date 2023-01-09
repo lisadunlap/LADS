@@ -50,7 +50,7 @@ class DomainNet:
 
 MINI_DOMAINS = ['clipart', 'painting', 'real', 'sketch'] 
 
-with open(f'/shared/lisabdunlap/data/domainnet/sentry_split/real_test_mini.txt') as f:
+with open(f'/shared/lisabdunlap/data/domainnet_sentry_split/real_test_mini.txt') as f:
     test_classes = f.read().splitlines()
 
 class_dict = {}
@@ -64,7 +64,7 @@ class OneDomain:
     def __init__(self, root: str, domain: str, split: str, transform):
         assert domain in ['clipart', 'painting', 'real', 'sketch'], 'domain must be one of clipart, real, painting, sketch'
         name = "train" if split == 'train' else "test"
-        labels_file = os.path.join(root, "domainnet", f"sentry_split/{domain}_{name}_mini.txt")
+        labels_file = os.path.join(root, "domainnet_sentry_split", f"{domain}_{name}_mini.txt")
         img_dir = os.path.join(root, "domainnet")
         with open(labels_file) as f:
             content = [line.rstrip().split(" ") for line in f]

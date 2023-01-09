@@ -26,6 +26,67 @@ import helpers
 
 import omegaconf
 
+def get_domain_text_embs(model, cfg, source_text_prompts, target_text_prompts, class_names):
+    """
+    Gets the text embeddings of the prompts describing the source and target domains. 
+    If generic is True, source_text_prompts and target_text_prompts are strings instead of 
+    templates to put the class name in. 
+    """
+    if cfg.AUGMENTATION.GENERIC:
+        text_embeddings = zeroshot_classifier(target_text_prompts, model, normalize=cfg.METHOD.NORMALIZE, model_type=cfg.EXP.IMAGE_FEATURES)
+        text_embeddings = np.transpose(text_embeddings, (1,0))
+        orig_prompts = text_embeddings
+        if len(source_text_prompts) > 0:
+            source_embeddings = zeroshot_classifier(source_text_prompts, model, normalize=cfg.METHOD.NORMALIZE, model_type=cfg.EXP.IMAGE_FEATURES)
+            print("source emb before averaging", source_embeddings.shape)
+            source_embeddings = source_embeddings.mean(dim=0)
+            print("source emb after averaging", source_embeddings.shape)
+            diffs = torch.stack([emb-source_embeddings[0] for emb in text_embeddings])
+            diffs /= text_embeddings.norm(dim=-1, keepdim=True)
+    else:
+        print(target_text_prompts)
+        # print("yo", len(source_text_prompts), len(source_text_prompts[0]))
+        # go on a per class basis
+        templates = target_text_prompts
+        all_texts = []
+        for t in source_text_prompts:
+            texts = [[t.format(c)] for c in class_names]
+            text_emb = zeroshot_classifier(texts, model, normalize=cfg.METHOD.NORMALIZE, model_type=cfg.EXP.IMAGE_FEATURES).T
+            print(texts, "text_emb", text_emb.shape)
+            all_texts.append(text_emb)
+        if type(target_text_prompts[0]) == str:
+            target_text_prompts = [target_text_prompts]
+        print(target_text_prompts)
+        for p in target_text_prompts:
+            print(p)
+            texts = [[t.format(c) for t in p] for c in class_names]
+            text_emb = zeroshot_classifier(texts, model, normalize=cfg.METHOD.NORMALIZE, model_type=cfg.EXP.IMAGE_FEATURES).T
+            all_texts.append(text_emb)
+        # this subtracts the neutral embedding from the domain embeddings and normalizes. 
+        text_pairs = torch.stack(all_texts)
+        print("text pairs", text_pairs.shape)
+        target_embeddings, source_embeddings = text_pairs, []
+        if len(source_text_prompts) > 0:
+            source_embeddings = text_pairs[:len(source_text_prompts)]
+            target_embeddings = text_pairs[len(source_text_prompts):]
+        else:
+            source_embeddings = torch.zeros_like(target_embeddings)
+        #     text_diffs = []
+        #     source_domain = text_pairs[0]
+        #     for target_domain in text_pairs[1:]:
+        #         diff = target_domain - source_domain
+        #         diff /= np.linalg.norm(diff, axis=-1, keepdims=True)
+        #         # diff = np.expand_dims(diff, axis=0)
+        #         text_diffs.append(diff)
+        # else:
+        #     target_embeddings = text_pairs
+        #     text_diffs = text_pairs
+        # diffs = torch.stack(text_diffs).permute(1,0,2) # should be (num_classes, num_domains, emb_size)
+        # print("diffs shape", diffs.shape)
+        # print("source embeddings", source_embeddings.shape)
+        print("target embeddings", target_embeddings.shape)
+    return source_embeddings, target_embeddings
+
 def get_features(dataset, model, device, model_type):
     if model_type != 'clip' and model_type != 'openclip':
         return get_resnet_features(dataset, model, device)
@@ -47,50 +108,6 @@ def get_features(dataset, model, device, model_type):
             all_filenames.extend(filenames)
 
     return torch.cat(all_features).cpu().numpy(), torch.cat(all_labels).cpu().numpy(), torch.cat(all_groups).cpu().numpy(), torch.cat(all_domains).cpu().numpy(), np.array(all_filenames)
-
-def get_aug_features(dataset, model, device, text_prompts):
-    all_features = []
-    all_labels = []
-    all_groups, all_domains = [], []
-    print(text_prompts)
-    
-    
-    with torch.no_grad():
-        text_inputs = torch.cat([clip.tokenize(word[0]) for word in text_prompts]).to(device)
-        # print(text_inputs)
-        text_embeddings = model.encode_text(text_inputs)
-        # get text embedding of "a photo of a digit" 
-        print(len(text_inputs[0]))
-        # print(type(text_prompts[0][0]))
-        control = torch.cat([clip.tokenize("An image of a digit") ]).to(device)
-        control_embedding = model.encode_text(control)
-        for batch in tqdm(dataset):
-            images, labels, groups, domains = batch['image'], batch['label'], batch['group'], batch['domain']
-            features = model.encode_image(images.to(device))
-            # append unaltered training data
-            all_features.append(features)
-            all_labels.append(labels)
-            all_groups.append(groups) # group is the label 
-            all_domains.append(domains) # red, green, blue, etc: label 
-            # append training data combined with every text prompt embedding
-            ref = features
-            # print(len(text_embeddings[0]))
-            # print(len(features[0]))
-            for i in range(len(text_embeddings)):
-                features = ref 
-                # features = torch.add(features, text_embeddings[i])
-                # features = torch.add(features, (features * text_embeddings[i] / text_embeddings[i]* text_embeddings[i]) * text_embeddings[i])
-                features = torch.add(control_embedding, torch.add(features, text_embeddings[i])) / 3
-                all_features.append(features)
-                all_labels.append(labels)
-                all_groups.append(groups)
-                all_domains.append(domains)
-        
-    
-    # print(torch.cat(all_features))
-    first = torch.cat(all_features).cpu().numpy()
-    
-    return first, torch.cat(all_labels).cpu().numpy(), torch.cat(all_groups).cpu().numpy(), torch.cat(all_domains).cpu().numpy()
 
 def get_resnet_features(dataset, model, device):
     """
@@ -124,26 +141,6 @@ def get_resnet_features(dataset, model, device):
 def projection(u, v):
     return (v * u).sum() / (u * u).sum() * u
 
-def gram_schmidt(vv):
-    """
-    Creates orthonormal vectors which span the same space
-    """
-    nk = vv.size(1)
-    uu = torch.zeros_like(vv, device=vv.device)
-    print("shape ", uu.shape)
-    uu[:, 0] = vv[:, 0].clone()
-    for k in range(1, nk):
-        vk = vv[:, k].clone()
-        uk = 0
-        for j in range(0, k):
-            uj = uu[:, j].clone()
-            uk = uk + projection(uj, vk)
-        uu[:, k] = vk - uk
-    for k in range(nk):
-        uk = uu[:, k].clone()
-        uu[:, k] = uk / uk.norm()
-    return uu
-
 def evaluate(predictions, labels, groups=[], label_names=None, num_augmentations=1):
     """
     Gets the evaluation metrics given the predictions and labels. 
@@ -174,6 +171,7 @@ def get_per_group_acc(value, predictions, labels, groups):
     return np.mean((labels[indices] == predictions[indices]).astype(np.float)) * 100.
 
 def zeroshot_classifier(prompts, model, normalize=True, model_type='clip', cuda_device='0'):
+    """ Computes CLIP text embeddings for a list of prompts. """
     model.eval()
     assert type(prompts[0]) == list, "prompts must be a list of lists"
     with torch.no_grad():
@@ -212,97 +210,22 @@ def get_nn_metrics(aug_set, aug_domains, aug_labels, sample_set, sample_domains,
     class_acc = np.mean((aug_labels == neighbor_labels).astype(np.float)) * 100.
     return neighbor_domains, neighbor_labels, domain_acc, class_acc, neighbor_samples, prop_unique, mean_cs
 
-def get_clip_emb_drift(aug_set, aug_domains, sample_set, sample_domains, num_domains, val_set, val_domains):
-    """
-    For source domain S and target domain T,
-    csim(I_S(test), I_T(test)) < csim(I_Aug)
-    """
-    # split test set
-    # sample_set = sample_set / np.linalg.norm(sample_set, axis=-1, keepdims=True)
-    # aug_set_norm = aug_set / np.linalg.norm(aug_set, axis=-1, keepdims=True)
-    source_imgs = sample_set[np.where(sample_domains == 0)]
-    source_imgs_norm = source_imgs / np.linalg.norm(source_imgs, axis=-1, keepdims=True)
-    aug_set_norm = aug_set / np.linalg.norm(aug_set, axis=-1, keepdims=True)
-    val_imgs_norm = val_set / np.linalg.norm(val_set, axis=-1, keepdims=True)
-    metrics = {"cosine": {"clip": {"mean":[], "std": [], "max": [], "min": []}, "aug": {"mean":[], "std": [], "max": [], "min": []}}, "euclidean": {"clip": {"mean":[], "std": [], "max": [], "min": []}, "aug": {"mean":[], "std": [], "max": [], "min": []}}}
-    
-    similarities = distance.cdist(val_imgs_norm, source_imgs_norm, 'euclidean')
-    nn_sim = np.min(similarities, axis=1)
-    metrics['euclidean']['clip']['mean'].append(np.round(np.mean(nn_sim), 3))
-    metrics['euclidean']['clip']['max'].append(np.round(np.max(nn_sim), 3))
-    metrics['euclidean']['clip']['min'].append(np.round(np.min(nn_sim), 3))
-    metrics['euclidean']['clip']['std'].append(np.round(np.std(nn_sim), 3))
-    similarities = distance.cdist(aug_set_norm, source_imgs_norm, 'euclidean')
-    nn_sim = np.min(similarities, axis=1)
-    metrics['euclidean']['aug']['mean'].append(np.mean(nn_sim))
-    metrics['euclidean']['aug']['max'].append(np.max(nn_sim))
-    metrics['euclidean']['aug']['min'].append(np.min(nn_sim))
-    metrics['euclidean']['aug']['std'].append(np.std(nn_sim))
 
-    #cosine sim 
-    nn_sim = np.max(val_imgs_norm @ source_imgs_norm.T, axis=1)  
-    metrics['cosine']['clip']['mean'].append(np.round(np.mean(nn_sim), 3))
-    metrics['cosine']['clip']['max'].append(np.round(np.max(nn_sim), 3))
-    metrics['cosine']['clip']['min'].append(np.round(np.min(nn_sim), 3))
-    metrics['cosine']['clip']['std'].append(np.round(np.std(nn_sim), 3))
-    nn_sim = np.max(aug_set_norm @ source_imgs_norm.T, axis=1)  
-    metrics['cosine']['aug']['mean'].append(np.round(np.mean(nn_sim), 3))
-    metrics['cosine']['aug']['max'].append(np.round(np.max(nn_sim), 3))
-    metrics['cosine']['aug']['min'].append(np.round(np.min(nn_sim), 3))
-    metrics['cosine']['aug']['std'].append(np.round(np.std(nn_sim), 3))
-
-    for domain in range(1, num_domains+1):
-        target_imgs = sample_set[np.where(sample_domains == domain)]
-        # cosine sim
-        target_imgs_norm = target_imgs / np.linalg.norm(target_imgs, axis=-1, keepdims=True)
-        similarities = distance.cdist(val_imgs_norm, target_imgs_norm, 'euclidean')
-        nn_sim = np.min(similarities, axis=1)
-        metrics['euclidean']['clip']['mean'].append(np.round(np.mean(nn_sim), 3))
-        metrics['euclidean']['clip']['max'].append(np.round(np.max(nn_sim), 3))
-        metrics['euclidean']['clip']['min'].append(np.round(np.min(nn_sim), 3))
-        metrics['euclidean']['clip']['std'].append(np.round(np.std(nn_sim), 3))
-        similarities = distance.cdist(aug_set_norm, target_imgs_norm, 'euclidean')
-        nn_sim = np.min(similarities, axis=1)
-        metrics['euclidean']['aug']['mean'].append(np.round(np.mean(nn_sim), 3))
-        metrics['euclidean']['aug']['max'].append(np.round(np.max(nn_sim), 3))
-        metrics['euclidean']['aug']['min'].append(np.round(np.min(nn_sim), 3))
-        metrics['euclidean']['aug']['std'].append(np.round(np.std(nn_sim), 3))
-
-        #cosine sim 
-        nn_sim = np.max(val_imgs_norm @ target_imgs_norm.T, axis=1)  
-        metrics['cosine']['clip']['mean'].append(np.round(np.mean(nn_sim), 3))
-        metrics['cosine']['clip']['max'].append(np.round(np.max(nn_sim), 3))
-        metrics['cosine']['clip']['min'].append(np.round(np.min(nn_sim), 3))
-        metrics['cosine']['clip']['std'].append(np.round(np.std(nn_sim), 3))
-        nn_sim = np.max(aug_set_norm @ target_imgs_norm.T, axis=1)  
-        metrics['cosine']['aug']['mean'].append(np.round(np.mean(nn_sim), 3))
-        metrics['cosine']['aug']['max'].append(np.round(np.max(nn_sim), 3))
-        metrics['cosine']['aug']['min'].append(np.round(np.min(nn_sim), 3))
-        metrics['cosine']['aug']['std'].append(np.round(np.std(nn_sim), 3))
-        # breakpoint()
-
-        print("cosine similarities ", nn_sim)
-        
-        return metrics
-
-
-def get_ensamble_preds(val_features, model, zeroshot_weights, model_type='LR', dataset_domains=None):
+def get_ensamble_preds(val_features, probs, zeroshot_weights, dataset_domains=None):
     """
     Take in the clip image mebeddings, classfier, and clip ZS text embeddings, 
     averages the probabilites, and returns the predictions
     """
+    print("ENSAMBLE PREDS", probs[0].shape)
     if dataset_domains is not None:
         soft_dom_label = np.matmul(val_features, dataset_domains.cpu().numpy())
         soft_dom_label = soft_dom_label.argmax(axis=1)
 
-    if model_type == 'LR':
-        outputs = model.predict_proba(val_features)
-    else:
-        # hacky: for MLP, model=output probs
-        try:
-            outputs = model.cpu().numpy()
-        except:
-            outputs = model
+    # hacky: for MLP, model=output probs
+    try:
+        outputs = probs.cpu().numpy()
+    except:
+        outputs = probs
     print(outputs.shape)
     salem_preds = np.argmax(outputs, axis=1)
     print(salem_preds.shape)

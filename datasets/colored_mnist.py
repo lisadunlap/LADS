@@ -72,7 +72,7 @@ class MNIST:
         img = Image.fromarray(img.numpy(), mode="L").resize((224, 224))
         filename = f"{self.root}/MNIST/{self.split}-{old_idx}.jpg"
         if not os.path.exists(f"{self.root}/MNIST/"):
-            os.makedir(f"{self.root}/MNIST/")
+            os.makedirs(f"{self.root}/MNIST/")
         if not os.path.exists(filename):
             img.save(filename)
         if self.transform:

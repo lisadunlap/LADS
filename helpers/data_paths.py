@@ -34,6 +34,8 @@ DATASET_PATHS = {
                 "Waterbirds": "data/waterbirds/vit14_clip.pth",
                 "ColoredMNISTBinary": "data/ColoredMNIST/binary_vit14.pth",
                 "OfficeHomeProduct": "data/OfficeHome/product_vit14.pth",
+                "OfficeHomeClipart": "data/OfficeHome/clipart_vit14.pth",
+                "OfficeHomeArt": "data/OfficeHome/art_vit14.pth",
                 "GroZi": "data/GroZi/vit14.pth",
                 },
     },

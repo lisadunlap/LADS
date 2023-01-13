@@ -5,6 +5,11 @@ Official Implementation of [LADS (Latent Augmentation using Domain descriptionS)
 
 *WARNING: this is still WIP, please raise an issue if you run into any bugs.*
 
+## TODOs
+[] add e2e method for DA
+[] add in selective augmentation
+[] run 2 layer mlp baselines
+
 ## Getting started
 
 1. Install the dependencies for our code using Conda. You may need to adjust the environment YAML file depending on your setup.

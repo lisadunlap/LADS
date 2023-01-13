@@ -3,13 +3,8 @@ EXP:
   WANDB_SILENT: False
   PROJ: "CUB_Painting_E2E"
   SEED: 0
-  # TEXT_PROMPTS: [["clipart"], ["painting"], ["real photo"]]
-  # TEXT_PROMPTS: [['a painting of a bird']]
-  TEXT_PROMPTS: [['a painting of a {} bird.']]
-  # TEXT_PROMPTS: ['an anime drawing of a {} bird.']
+  TEXT_PROMPTS: [['a painting of a {} bird.'], ['art of a {} bird.'], ['a drawing of a {} bird.']]
   NEUTRAL_TEXT_PROMPTS: ['a photo of a {} bird.']
-  # NEUTRAL_TEXT_PROMPTS: [['a photo of a bird']]
-  # AUGMENTATION: 'None'
   EPOCHS: 200
   LOG_HIST: False
   ENSAMBLE: True
@@ -42,3 +37,5 @@ AUGMENTATION:
   ALPHA: 0.5
   GENERIC: False
   DOM_LABELS: ['painting']
+  RANDOMIZE_PROB: 0.0
+  RANDOMIZE: False

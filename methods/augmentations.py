@@ -25,7 +25,7 @@ except:
     progress_bar = lambda current, total, msg: None
 
 import helpers.data_helpers as dh
-from methods.clip_transformations import EmbeddingDataset
+from methods.lads_utils import EmbeddingDataset, get_domain_text_embs, DirectionLoss
 from clip_utils import *
 from methods import predictors
 
@@ -284,14 +284,6 @@ class Directional(Augment):
         try:
             self.orig_prompts = torch.Tensor(self.get_orig_text_embeddings(self.prompts).transpose((1, 0, 2))).float().cuda()
             self.neutral_embs = torch.Tensor(self.get_orig_text_embeddings(self.neutral_prompts).transpose((1, 0, 2))).float().cuda()
-            # if len(self.orig_prompts) > 1:
-            #     raise ValueError("this only works for one domain shift atm")
-            print('=========================')
-            print('=========================')
-            print("task specific text emb ", self.orig_prompts.shape, self.orig_prompts[0].shape, torch.transpose(self.orig_prompts[0].float().cuda(), 1, 0).shape, self.class_text_embs.shape)
-            print('=========================')
-            print('=========================')
-            # stack = [torch.mean(self.neutral_embs, dim=1)] + torch.mean(self.orig_prompts, dim=1)
             self.val_dom_check = torch.squeeze(torch.cat([torch.mean(self.neutral_embs, dim=1), torch.mean(self.orig_prompts, dim=1)]), dim=1).float().cuda()
             self.val_dom_check = torch.transpose(self.val_dom_check, 0, 1)
             print("val domain check shape ", self.val_dom_check.shape, self.class_text_embs.shape)
@@ -299,15 +291,14 @@ class Directional(Augment):
             print("can't load prompts")
 
         if not self.cfg.AUGMENTATION.GENERIC:
-
+            print("------------ training ------------")
             if self.cfg.AUGMENTATION.DOM_SPECIFIC_XE:
                 print("DOMAIN SPECIFIC PROMPTS")
-                print("task specific text emb ", self.orig_prompts.shape)
                 for i in range(len(self.orig_prompts)):
-                    self.train_network("sketch", self.orig_prompts[:,i], i)
+                    self.train_network("sketch", self.orig_prompts[i], i)
             else:
-                for i in range(len(self.text_features[0])):
-                    self.train_network("sketch", self.text_features[:,i], i)
+                for i in range(len(self.text_features)):
+                    self.train_network("sketch", self.text_features[i], i)
         else:
             for i in range(len(self.text_features)):
                 self.train_network("sketch", self.text_features[i], i)
@@ -322,10 +313,11 @@ class Directional(Augment):
         source and target domain.
         """
         if not self.cfg.AUGMENTATION.GENERIC:
-            delta_t = torch.Tensor(self.text_features[:,num_net])
+            delta_t = torch.Tensor(self.text_features[num_net])
         else:
             delta_t = torch.Tensor(self.text_features[num_net])
         delta_t = delta_t.type(torch.float).cuda()
+        print("delta shape ", delta_t.shape, self.text_features.shape)
         
         def custom_loss(predictions, labels, targets):
             total_sum = None
@@ -544,27 +536,6 @@ class Directional(Augment):
         net.load_state_dict(checkpoint['net'])
         print(f"...loaded checkpoint with acc {checkpoint['acc']}")
         return net
-
-from clip_utils import get_domain_text_embs
-
-class DirectionLoss(torch.nn.Module):
-
-    def __init__(self, loss_type='mse'):
-        super(DirectionLoss, self).__init__()
-
-        self.loss_type = loss_type
-
-        self.loss_func = {
-            'mse':    torch.nn.MSELoss,
-            'cosine': torch.nn.CosineSimilarity,
-            'mae':    torch.nn.L1Loss
-        }[loss_type]()
-
-    def forward(self, x, y):
-        if self.loss_type == "cosine":
-            return 1. - self.loss_func(x, y)
-        
-        return self.loss_func(x, y)
 
 class LADS(Augment):
     """

@@ -7,7 +7,7 @@ Official Implementation of [LADS (Latent Augmentation using Domain descriptionS)
 
 ## TODOs
 [] add e2e method for DA
-[] add in selective augmentation
+[] add in selective augmentation (run lp, check per class acc, augment poor performing finetuned classes more towards the text emb)
 [] run 2 layer mlp baselines
 
 ## Getting started

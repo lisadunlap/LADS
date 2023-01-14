@@ -219,13 +219,6 @@ val_predictions, val_probs = bias_correction.eval(val_features)
 val_accuracy, val_balanced_acc, val_class_accuracy, val_group_accuracy = evaluate(val_predictions, val_labels, np.squeeze(val_groups), num_augmentations=num_augmentations)
 accuracy, balanced_acc, class_accuracy, group_accuracy = evaluate(predictions, test_labels, np.squeeze(test_groups), num_augmentations=num_augmentations)
 _, _, _, domain_accuracy = evaluate(predictions, test_labels, np.squeeze(test_domains), list(range(len(dataset_classes))), num_augmentations=num_augmentations)
-print("RIGHT BEFORE WANDB LOGGING")
-# # per domain acc
-# for d in range(len(dataset_domains)):
-#     dom_accuracy, dom_balanced_acc, dom_class_accuracy, dom_group_accuracy = evaluate(predictions[test_groups == d], test_labels[test_groups == d], test_groups[test_groups == d])
-#     for i in range(len(dataset_classes)):
-#         wandb.summary[f"{dataset_classes[i]} {dataset_domains[d]} test acc"] = dom_class_accuracy[i]
-# group_acc = group_accuracy.reshape(len(dataset_classes), int(len(group_accuracy)/len(dataset_classes)))
 wandb.summary["test acc"] = accuracy
 wandb.summary["test blanced acc"] = balanced_acc
 wandb.summary["test class acc"] = class_accuracy
@@ -235,7 +228,6 @@ wandb.summary['test group acc'] = group_accuracy
 for i in range(len(domain_accuracy)):
     wandb.summary[f"{dataset_domains[i]} test acc"] = domain_accuracy[i]
 print(f"Test accuracy: {group_accuracy} \n Test domain accuracy: {domain_accuracy}")
-print("RIGHT AFTER WANDB LOGGING")
 
 if 'E2E' in args.EXP.ADVICE_METHOD:
     # features, labels, groups, domains, filenames = np.concatenate([old_val_features, old_test_features]), np.concatenate([old_val_labels, old_test_labels]), np.concatenate([old_val_groups, old_test_groups]), np.concatenate([old_val_domains, old_test_domains]), np.concatenate([old_val_filenames, old_test_filenames])
@@ -244,7 +236,7 @@ if 'E2E' in args.EXP.ADVICE_METHOD:
     # print("SAMPLE SHAPE: ", sample_filenames.shape, sample_domains.shape)
     sample_features, sample_domains, sample_labels, sample_filenames = aug_features[sample_idxs], aug_domains[sample_idxs], aug_labels[sample_idxs], aug_filenames[sample_idxs]
     print("UNIQUE DOMAINS ", np.unique(aug_domains))
-    neighbor_domains, neighbor_labels, domain_acc, class_acc, neighbor_samples, prop_unique, mean_cs = cu.get_nn_metrics(sample_features, sample_domains, sample_labels, old_test_features, old_test_domains, old_test_labels)
+    neighbor_domains, neighbor_labels, domain_acc, class_acc, neighbor_samples, prop_unique, mean_cs = get_nn_metrics(sample_features, sample_domains, sample_labels, old_test_features, old_test_domains, old_test_labels)
     wandb.log({"mean CS for NN": mean_cs})
     print(neighbor_samples)
     plt.rcParams["figure.figsize"] = (20,5)

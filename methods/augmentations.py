@@ -222,20 +222,12 @@ class SLERP(Addition):
         Augments a single by taking the shperical interpolation of the image emb and text emn
         """
         return [self.slerp(img_embedding, feat, self.alpha) for feat in text_features]
-
-    # def get_text_embeddings(self, model_name, prompts, norm=True):
-    #     text_embs = zeroshot_classifier(prompts, self.model, model_type=self.cfg.EXP.IMAGE_FEATURES).cpu().numpy().T
-    #     if norm:
-    #         text_embs /= np.linalg.norm(text_embs, axis=-1, keepdims=True)
-    #     return text_embs
         
     @staticmethod
     def slerp(p0, p1, t):
         omega = np.arccos(np.dot(p0/np.linalg.norm(p0), p1/np.linalg.norm(p1)))
         so = np.sin(omega)
         return np.sin((1.0-t)*omega) / so * p0 + np.sin(t*omega)/so * p1
- 
-# TO-DO: Implement learned augmentation using CLIP_{direction} loss function  
 
 class MLP(nn.Module):
     def __init__(self, input_dim=768, hidden_dim=384):

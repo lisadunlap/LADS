@@ -133,6 +133,11 @@ class ClipMLP(Base):
         self.cfg = cfg
         self.uid = uuid.uuid4()
 
+    def get_checkpoint_name(self, last=False):
+        if last:
+            return f"./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth"
+        return f"./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth"
+
     def create_model(self, inputs):
         B, W  = inputs.shape
         self.model_conf = OmegaConf.create({"in_dim": W, "h_dim": self.cfg.METHOD.MODEL.HIDDEN_DIM, "out_dim": self.train_dataset.num_classes, "num_classes": self.train_dataset.num_classes, "num_domains": self.train_dataset.num_domains, "num_layers": self.cfg.METHOD.MODEL.NUM_LAYERS})
@@ -233,14 +238,10 @@ class ClipMLP(Base):
 
     def eval(self, inputs, ret_probs=False):
         """ Forward pass for classification. if probs=True, return the softmax prob (for ensambling) """
-        try:
-            ckpt = f"./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth"
-            print(f"loading checkpoint {ckpt}...")
-            self.load_checkpoint(ckpt)
-        except:
-            ckpt = f"./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth"
-            print(f"loading checkpoint {ckpt}...")
-            self.load_checkpoint(ckpt)
+
+        ckpt = self.get_checkpoint_name()
+        print(f"loading checkpoint {ckpt}...")
+        self.load_checkpoint(ckpt)
         generator = chunks(torch.tensor(inputs).cuda().float(), self.cfg.DATA.BATCH_SIZE)
         preds, probs = np.array([]), []
         for i, inp in enumerate(generator):
@@ -323,14 +324,6 @@ class AugE2EMLPMulti(ClipMLP):
         try:
             self.orig_prompts = torch.Tensor(self.get_orig_text_embeddings(self.text_prompts).transpose((1, 0, 2))).float().cuda()
             self.neutral_embs = torch.Tensor(self.get_orig_text_embeddings(self.neutral_prompts).transpose((1, 0, 2))).float().cuda()
-            # if len(self.orig_prompts) > 1:
-            #     raise ValueError("this only works for one domain shift atm")
-            print('=========================')
-            print('=========================')
-            print("task specific text emb ", self.orig_prompts.shape, self.orig_prompts[0].shape, torch.transpose(self.orig_prompts[0].float().cuda(), 1, 0).shape, self.class_text_embs.shape)
-            print('=========================')
-            print('=========================')
-            # stack = [torch.mean(self.neutral_embs, dim=1)] + torch.mean(self.orig_prompts, dim=1)
             self.val_dom_check = torch.squeeze(torch.cat([torch.mean(self.neutral_embs, dim=1), torch.mean(self.orig_prompts, dim=1)]), dim=1).float().cuda()
             self.val_dom_check = torch.transpose(self.val_dom_check, 0, 1)
             print("val domain check shape ", self.val_dom_check.shape, self.class_text_embs.shape)
@@ -349,7 +342,7 @@ class AugE2EMLPMulti(ClipMLP):
         print(f"...loaded checkpoint with acc {checkpoint['acc']}")
 
     def save_checkpoint(self, acc, epoch, last=False):
-        print(f'Saving checkpoint with acc {acc} to ./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth...')
+        print(f'Saving checkpoint with acc {acc} to .{self.get_checkpoint_name()}...')
         state = {
             "acc": acc,
             "epoch": epoch,
@@ -357,11 +350,11 @@ class AugE2EMLPMulti(ClipMLP):
             "aug_net": self.aug_net.state_dict()
         }
         if last:
-            torch.save(state, f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth')
-            wandb.save(f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}-last.pth')
+            torch.save(state, f'{self.get_checkpoint_name()[:-4]}-last.pth')
+            wandb.save(f'{self.get_checkpoint_name()[:-4]}-last.pth')
         else:
-            torch.save(state, f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth')
-            wandb.save(f'./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth')
+            torch.save(state, self.get_checkpoint_name())
+            wandb.save(self.get_checkpoint_name())
 
     def create_model(self, inputs):
         B, W  = inputs.shape
@@ -485,11 +478,9 @@ class AugE2EMLPMulti(ClipMLP):
                 else:
                     diff_img_embeddings = torch.sub(aug_inp, inp)
                 img_directional.append(diff_img_embeddings / diff_img_embeddings.norm(dim=-1, keepdim=True))
-                num_classes, num_domains, emb_dim = self.text_embeddings.shape
-                print("text embeddings ", self.text_embeddings.shape, self.text_embeddings[domain].shape)
+                num_domains, num_classes, emb_dim = self.text_embeddings.shape
                 text_emb = torch.Tensor(self.text_embeddings[domain]).reshape((num_classes, 1, emb_dim)).cuda()
 
-                print("text diff ", text_emb.shape)
                 if not self.cfg.AUGMENTATION.GENERIC:
                     text_diffs = torch.cat([text_emb[y] for y in cls_target])
                 else:
@@ -536,8 +527,7 @@ class AugE2EMLPMulti(ClipMLP):
     def test(self, epoch, load=True):
         ## load best model
         if load:
-            ckpt = f"./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth"
-            self.load_checkpoint(ckpt)
+            self.load_checkpoint(self.get_checkpoint_name())
         self.net.eval()
         self.aug_net.eval()
         test_cls_loss, test_dom_loss, cls_correct, total = 0, 0, 0, 0
@@ -573,8 +563,8 @@ class AugE2EMLPMulti(ClipMLP):
                     else:
                         diff_img_embeddings = torch.sub(aug_inp, inp)
                     img_directional.append(diff_img_embeddings / diff_img_embeddings.norm(dim=-1, keepdim=True))
-                    num_classes, num_domains, emb_dim = self.text_embeddings.shape
-                    text_emb = torch.Tensor(self.text_embeddings[:, domain, :]).reshape((num_classes, 1, emb_dim)).cuda()
+                    num_domains, num_classes, emb_dim = self.text_embeddings.shape
+                    text_emb = torch.Tensor(self.text_embeddings[domain]).reshape((num_classes, 1, emb_dim)).cuda()
 
                     if not self.cfg.AUGMENTATION.GENERIC:
                         text_diffs = torch.cat([text_emb[y] for y in cls_target])
@@ -614,7 +604,7 @@ class AugE2EMLPMulti(ClipMLP):
         and changes the domain (rn only works with 1 domain) to be used in the nearest neighbor
         ablations. 
         """
-        ckpt = f"./checkpoint/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth"
+        ckpt = self.get_checkpoint_name()
         print(f"loading checkpoint {ckpt}...")
         self.load_checkpoint(ckpt)
         print("domain indices", self.domain_indexes)

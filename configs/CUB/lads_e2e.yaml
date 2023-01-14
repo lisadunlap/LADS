@@ -17,12 +17,12 @@ DATA:
 
 METHOD:
   MODEL:
-    NUM_LAYERS: 1
+    NUM_LAYERS: 2
     DOM_WEIGHT: 1.0
     LR: 0.001
     WEIGHT_DECAY: 0.05
     CHECKPOINT: 'checkpoint/mlp_simple.pth'
-    CHECKPOINT_NAME: 'CUB/salem-e2e'
+    CHECKPOINT_NAME: 'CUB'
     RESUME: False
   USE_DOM_GT: True
 
@@ -37,5 +37,8 @@ AUGMENTATION:
   ALPHA: 0.5
   GENERIC: False
   DOM_LABELS: ['painting']
-  RANDOMIZE_PROB: 0.0
+  RANDOMIZE_PROB: 1.0
   RANDOMIZE: False
+  REG_WEIGHT: 0.1
+  CC_WEIGHT: 1.0
+  CYCLE_GAN_WEIGHT: 0.0

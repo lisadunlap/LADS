@@ -52,7 +52,6 @@ class Base:
     def __init__(self, text_prompts, model, cfg, neutral_prompts=[]):
         self.class_names = DATASET_CLASSES[cfg.DATA.DATASET]
         self.domain_names = DATASET_DOMAINS[cfg.DATA.DATASET]
-        print("TEXT PROMPTS ", text_prompts, neutral_prompts)
         self.target_prompts = text_prompts
         self.cfg = cfg
         self.model = model
@@ -78,52 +77,33 @@ class Base:
             return self.normalize(inputs)
         return inputs
 
-# class EmbeddingDataset:
-#     """
-#     Takes in CLIP embeddings (INPUTS), labels, and CLIP text embedding (TEXT_EMB of shape (num_domains, clip emb shape)).
-#     Weakly labels the domain using the text embeddings 
-#     TODO: try softlabels
-#     """
-#     def __init__(self, cfg, inputs, labels, groups, dom_gt, text_emb=[]):
-#         self.inputs, self.labels, self.groups = inputs, labels, groups
-#         self.text_emb = text_emb
-#         self.cfg = cfg
-#         _, self.embedding_dim = inputs.shape
-#         if self.cfg.METHOD.USE_DOM_GT:
-#             print("==> Using domain GT labels")
-#             self.domain_labels = dom_gt
-#         else:
-#             print("==> Using domain CLIP labels")
-#             self.domain_labels = self.get_labels(self.text_emb, self.inputs) if len(self.text_emb) > 0 else np.array([0 for i in range(len(self.inputs))])
-#         self.num_classes, self.num_domains = len(set(self.labels)), len(set(self.domain_labels))
-#         # get class weights for upweighting
-#         self.class_weights = self.get_counts(self.labels)
-#         self.dom_weights = self.get_counts(self.domain_labels)
-#         assert len(self.inputs) == len(self.labels) == len(self.domain_labels), "input, label, and domain label lengths don't match"
+class CLIPZS(Base):
+    """
+    CLIPZS method. Computes CLIP embeddings and then applies a zero-shot classifier.
+    """
+    def __init__(self, text_prompts, model, cfg, neutral_prompts=[]):
+        super().__init__(text_prompts, model, cfg, neutral_prompts)
+        templates = getattr(helpers.text_templates, cfg.EXP.TEMPLATES)
+        text_embs = zeroshot_classifier([[p.format(c) for p in templates] for c in self.class_names], model, model_type=self.cfg.EXP.IMAGE_FEATURES, cuda_device='1')
+        self.class_text_embs = text_embs.float().cuda()
+        print("class text embs", self.class_text_embs.shape)
 
-#     @staticmethod
-#     def get_counts(labels):
-#         values, counts = np.unique(labels, return_counts=True)
-#         sorted_tuples = zip(*sorted(zip(values, counts))) # this just ensures we are getting the counts in the sorted order of the keys
-#         values, counts = [ list(tuple) for tuple in  sorted_tuples]
-#         fracs   = 1 / torch.Tensor(counts)
-#         return fracs / torch.max(fracs)
+    def train_debias(self, inputs, labels, groups, dom_gt, test_inputs, test_labels, test_groups, test_dom_gt):
+        pass
 
-#     @staticmethod
-#     def get_labels(text_emb, inputs):
-#         """ Gets weak domain labels given CLIP text embeddings """
-#         if len(text_emb.shape) == 3:
-#             text_emb = torch.mean(text_emb, dim = 0)
-#             print("new text emb ", text_emb.shape)
-#         similarity = (100.0 * torch.Tensor(inputs).to(device).float() @ text_emb.T.to(device).float()).softmax(dim=-1)
-#         values, indices = similarity.topk(1)
-#         return [i[0].item() for i in indices]
-
-#     def __len__(self):
-#         return len(self.inputs)
-
-#     def __getitem__(self, idx):
-#         return self.inputs[idx], self.labels[idx], self.groups[idx], self.domain_labels[idx]
+    def eval(self, inputs):
+        with torch.no_grad():
+            preds, probs = np.array([]), []
+            generator = chunks(torch.tensor(inputs).cuda().float(), self.cfg.DATA.BATCH_SIZE)
+            for i, images in enumerate(generator):
+                images = images.cuda()
+                images /= images.norm(dim=-1, keepdim=True)
+                # predict
+                logits = (100. * images @ self.class_text_embs).float().softmax(dim=-1)
+                clip_pred = torch.argmax(logits, dim=-1)
+                preds = np.append(preds, clip_pred.cpu().numpy())
+                probs.append(logits.detach().cpu().numpy())
+        return preds, np.concatenate(probs, axis=0)
 
 class ClipMLP(Base):
 
@@ -164,7 +144,7 @@ class ClipMLP(Base):
         self.train_loader = torch.utils.data.DataLoader(self.train_dataset, batch_size=self.cfg.DATA.BATCH_SIZE, shuffle=True)
         self.test_dataset = EmbeddingDataset(self.cfg, test_inputs, test_labels, test_groups, test_dom_gt, self.text_emb)
         self.test_loader = torch.utils.data.DataLoader(self.test_dataset, batch_size=self.cfg.DATA.BATCH_SIZE, shuffle=False)
-
+        best_acc, best_epoch = 0, 0
         self.create_model(inputs) # create model
         if self.cfg.METHOD.MODEL.RESUME:
             print("----------- EVALUATING PREVIOUS CHECKPOINT -----------")
@@ -176,12 +156,17 @@ class ClipMLP(Base):
         if not self.cfg.METHOD.MODEL.RESUME:
             self.best_acc, self.best_epoch = 0, 0
             for epoch in range(self.cfg.EXP.EPOCHS):
-                self.train_val_loop(self.train_loader, epoch, phase="train")
+                train_acc = self.train_val_loop(self.train_loader, epoch, phase="train")
                 if self.cfg.EXP.CHECKPOINT_VAL:
-                    self.train_val_loop(self.test_loader, epoch, phase="val")
+                    val_acc = self.train_val_loop(self.test_loader, epoch, phase="val")
+                progress_bar(epoch+1, self.cfg.EXP.EPOCHS, 'Epoch %d | Train Loss: %.3f | Val Acc: %0.3f'
+                            % (epoch, train_acc, val_acc))
             self.save_checkpoint(0.0, epoch, last=True)
-            # wandb.ss['best val balanced acc'] = self.best_acc
-            # wandb.ss['best epoch'] = self.best_epoch
+            best_acc = self.best_acc
+            best_epoch = self.best_epoch
+
+        wandb.summary['best val acc'] = best_acc
+        wandb.summary['best val epoch'] = best_epoch
 
     def load_checkpoint(self, path):
         checkpoint = torch.load(path)
@@ -198,6 +183,7 @@ class ClipMLP(Base):
         One epoch of train-val loop.
         Returns of dict of metrics to log
         """
+        len_loader = len(loader)
         total_loss, cls_correct, total = 0,0,0
         if phase == "train":
             self.net.train()
@@ -225,8 +211,8 @@ class ClipMLP(Base):
                 cls_pred = np.append(cls_pred, cls_predicted.cpu().numpy())
                 cls_groups = np.append(cls_groups, cls_group.cpu().numpy())
                 dom_true = np.append(dom_true, dom_target.cpu().numpy())
-                progress_bar(i, len(self.test_loader), 'Loss: %.3f | Acc: %.3f (%d/%d)'
-                            % (total/(i+1), 100.*cls_correct/total, cls_correct, total))
+                # progress_bar(i, len_loader, 'Loss: %.3f | Acc: %.3f (%d/%d)'
+                #             % (total/(i+1), 100.*cls_correct/total, cls_correct, total))
         
         accuracy, balanced_acc, class_accuracy, group_accuracy =  evaluate(cls_pred, cls_true, cls_groups)
 
@@ -235,6 +221,7 @@ class ClipMLP(Base):
         if phase == 'val' and balanced_acc > self.best_acc:
             self.best_acc, self.best_epoch = balanced_acc, epoch
             self.save_checkpoint(balanced_acc, epoch)
+        return balanced_acc
 
     def eval(self, inputs, ret_probs=False):
         """ Forward pass for classification. if probs=True, return the softmax prob (for ensambling) """
@@ -256,7 +243,7 @@ class ClipMLP(Base):
 
 
     def save_checkpoint(self, acc, epoch, last=False):
-        print(f'Saving checkpoint with acc {acc} to ./checkpoint/{self.cfg.DATA.DATASET}/{self.cfg.METHOD.MODEL.CHECKPOINT_NAME}-{self.cfg.EXP.SEED}-{self.uid}.pth...')
+        print(f'Saving checkpoint with acc {acc}...')
         state = {
             "acc": acc,
             "epoch": epoch,
@@ -281,7 +268,6 @@ class ClipMLPZS(ClipMLP):
     def __init__(self, text_prompts, model, cfg, neutral_prompts=[]):
         super().__init__(text_prompts, model, cfg, neutral_prompts)
         templates = getattr(helpers.text_templates, cfg.EXP.TEMPLATES)
-        # texts = [template.format(classname) for template in templates]
         text_embs = zeroshot_classifier([[p.format(c) for p in templates] for c in self.class_names], model, model_type=self.cfg.EXP.IMAGE_FEATURES, cuda_device='1')
         self.class_text_embs = text_embs.float().cuda()
         print("class text embs", self.class_text_embs.shape)
@@ -311,9 +297,7 @@ class AugE2EMLPMulti(ClipMLP):
         for prompt in list(self.cfg.EXP.TEXT_PROMPTS):
             if len(list(self.cfg.AUGMENTATION.DOM_LABELS)) == 0:
                 if type(prompt) == omegaconf.listconfig.ListConfig:
-                    print("remove list")
                     prompt = prompt[0]
-                print(type(prompt), prompt, self.domain_names)
                 dom_idx = [i for i in range(len(self.domain_names)) if self.domain_names[i] in prompt]
                 assert len(dom_idx) == 1, "error indexing domains, make sure your text prompt contains the name of the domain"
                 self.domain_indexes.append(dom_idx[0])
@@ -342,7 +326,7 @@ class AugE2EMLPMulti(ClipMLP):
         print(f"...loaded checkpoint with acc {checkpoint['acc']}")
 
     def save_checkpoint(self, acc, epoch, last=False):
-        print(f'Saving checkpoint with acc {acc} to .{self.get_checkpoint_name()}...')
+        print(f'Saving checkpoint with acc {acc}...')
         state = {
             "acc": acc,
             "epoch": epoch,
@@ -370,7 +354,6 @@ class AugE2EMLPMulti(ClipMLP):
         self.aug_net = aug_net.cuda()
         # self.aug_net = torch.nn.DataParallel(self.aug_net)
         wandb.watch(aug_net, log_freq=10)
-        print("NUM DOMAINS ", len(self.text_embeddings), self.train_dataset.num_domains)
 
     def create_criterion(self):
         weights = self.train_dataset.class_weights if self.cfg.DATA.UPWEIGHT_CLASSES else None
@@ -429,7 +412,6 @@ class AugE2EMLPMulti(ClipMLP):
 
     @staticmethod
     def filter(inp, dom_target, domain):
-        # print(dom_target[dom_target == domain])
         if len(dom_target[dom_target == domain]) == 0:
             return torch.tensor([])
         return torch.stack([inp[i] for i in range(len(dom_target)) if dom_target[i].item() == domain]).cuda()
@@ -439,7 +421,7 @@ class AugE2EMLPMulti(ClipMLP):
         torch.autograd.set_detect_anomaly(True)
         self.net.train()
         self.aug_net.train()
-        train_cls_loss, train_dom_loss, train_loss, train_reg_loss, cls_correct, total = 0, 0, 0, 0, 0, 0
+        train_cls_loss, train_dom_loss, train_loss, train_reg_loss, train_cc_loss, cls_correct, total = 0, 0, 0, 0, 0, 0, 0
         for i, (inp, cls_target, cls_group, dom_target) in enumerate(self.train_loader):
             inp, cls_target= inp.cuda().float(), cls_target.cuda().long()
             self.aug_optimizer.zero_grad()
@@ -513,7 +495,8 @@ class AugE2EMLPMulti(ClipMLP):
 
             train_cls_loss += cls_loss.item()
             train_dom_loss += domain_loss.item()
-            train_loss += train_cls_loss + train_dom_loss
+            train_cc_loss += clip_cls_loss.item()
+            train_loss += train_cls_loss + train_dom_loss + train_cc_loss
             train_reg_loss += reg_loss.item()
             _, cls_predicted = self.m(torch.cat(out)).max(1)
             total += torch.cat(labels).size(0)
@@ -522,7 +505,7 @@ class AugE2EMLPMulti(ClipMLP):
             progress_bar(i, len(self.train_loader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
                          % (train_cls_loss/(i+1), 100.*cls_correct/total, cls_correct, total))
 
-        wandb.log({"train loss": train_loss/(i+1), "class loss": train_cls_loss/(i+1), "domain loss": train_dom_loss/(i+1), "train cls acc": 100.*cls_correct/total, "reg loss": train_reg_loss/(i+1)})
+        wandb.log({"train loss": train_loss/(i+1), "train cc loss": train_cc_loss/(i+1), "class loss": train_cls_loss/(i+1), "domain loss": train_dom_loss/(i+1), "train cls acc": 100.*cls_correct/total, "reg loss": train_reg_loss/(i+1)})
 
     def test(self, epoch, load=True):
         ## load best model

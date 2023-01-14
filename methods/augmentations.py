@@ -57,15 +57,13 @@ class Augment:
             print("DOM LABELS ", self.cfg.AUGMENTATION.DOM_LABELS, len(list(self.cfg.AUGMENTATION.DOM_LABELS)))
             if len(list(self.cfg.AUGMENTATION.DOM_LABELS)) == 0:
                 if type(prompt) == omegaconf.listconfig.ListConfig:
-                    print("remove list")
                     prompt = prompt[0]
-                print(type(prompt), prompt, self.domain_names)
                 dom_idx = [i for i in range(len(self.domain_names)) if self.domain_names[i] in prompt]
                 assert len(dom_idx) == 1, "error indexing domains, make sure your text prompt contains the name of the domain"
                 self.domain_indexes.append(dom_idx[0])
             else:
                 self.domain_indexes = [self.domain_names.index(p) for p in list(self.cfg.AUGMENTATION.DOM_LABELS)]
-        print("domain indexes ", self.domain_indexes)
+        # print("domain indexes ", self.domain_indexes)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if self.cfg.EXP.IMAGE_FEATURES == 'clip':
             model, preprocess = clip.load(self.cfg.EXP.CLIP_MODEL, device)
@@ -125,12 +123,12 @@ class Addition(Augment):
         super().__init__(cfg, image_features, labels, group_labels, domain_labels, filenames, text_features)
         self.class_names = dh.DATASET_CLASSES[cfg.DATA.DATASET]
         self.orig_text_embs = self.get_orig_text_embeddings(self.prompts)
-        print("neutral prompts ", self.neutral_prompts)
-        print("prompts ", self.prompts)
+        # print("neutral prompts ", self.neutral_prompts)
+        # print("prompts ", self.prompts)
         self.neutral_embedding = self.get_orig_text_embeddings(self.neutral_prompts)
         # self.neutral_embedding = zeroshot_classifier([self.neutral_prompts], self.model, model_type=self.cfg.EXP.IMAGE_FEATURES)
         # self.neutral_embedding /= np.linalg.norm(self.neutral_embedding, axis=-1, keepdims=True)
-        print("neutral embedding size ", self.neutral_embedding.shape, self.orig_text_embs.shape)
+        # print("neutral embedding size ", self.neutral_embedding.shape, self.orig_text_embs.shape)
 
     def get_interp(self, img_embedding, text_features, orig_text_embeddings):
         if self.alpha == 'cosine':
@@ -242,7 +240,7 @@ class MLP(nn.Module):
         return x
 
 class Directional(Augment): 
-    def __init__(self, cfg, image_features, labels, group_labels, domain_labels, filenames, text_features, val_image_features, val_labels, val_group_labels,val_domain_labels, val_filenames):
+    def __init__(self, cfg, image_features, labels, group_labels, domain_labels, filenames, text_features, val_image_features, val_labels, val_group_labels,val_domain_labels, class_weights=None):
         super().__init__(cfg, image_features, labels, group_labels, domain_labels, filenames, text_features)
         dataset = EmbeddingDataset(self.cfg, self.image_features, self.labels, self.group_labels, self.domain_labels)
         self.dataset = dataset
@@ -358,6 +356,8 @@ class Directional(Augment):
                     best_train_loss = val_metrics['val loss']
                     best_epoch = epoch
                     self.net_checkpoints[num_net] = self.save_checkpoint(best_train_loss, epoch, num_net)
+            progress_bar(epoch+1, self.cfg.AUGMENTATION.EPOCHS, 'Epoch: %d | Train Loss: %.3f | Val Loss: %.3f'
+                            % (epoch, train_metrics['train loss'], val_metrics['val loss']))
 
         wandb.summary[f"{self.prompts[num_net]} best epoch"] = best_epoch
         wandb.summary[f"{self.prompts[num_net]} best train_loss"] = best_train_loss
@@ -421,8 +421,8 @@ class Directional(Augment):
             train_loss += loss.item() 
 
             total += cls_target.size(0)
-            progress_bar(i, len(self.train_loader), 'Loss: %.3f'
-                            % (train_loss/(i+1)))
+            # progress_bar(i, len(self.train_loader), 'Loss: %.3f'
+            #                 % (train_loss/(i+1)))
 
         metrics = {"train class loss": train_class_loss/(i+1), "train directional loss": train_directional_loss/(i+1), "train nn loss": train_nn_loss/(i+1), "train loss": train_loss/(i+1), "epoch": epoch}
         wandb.log(metrics)
@@ -508,14 +508,14 @@ class Directional(Augment):
         # val = torch.tensor(output)
         return list(np.array(output))
 
-    def save_checkpoint(self, acc, epoch, num_net):
+    def save_checkpoint(self, loss, epoch, num_net):
         checkpoint_dir = os.path.join("./checkpoint", self.cfg.DATA.DATASET)
         if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
         path = f'./checkpoint/{self.cfg.DATA.DATASET}/{self.prompts[num_net]}-{self.cfg.EXP.SEED}-{self.uid}.pth'
-        print(f'Saving checkpoint with acc {acc} to {path}...')
+        print(f'Saving checkpoint with loss {loss} to {path}...')
         state = {
-            "acc": acc,
+            "loss": loss,
             "epoch": epoch,
             "net": self.nets[num_net].state_dict()
         }
@@ -526,7 +526,7 @@ class Directional(Augment):
     def load_checkpoint(self, net, path):
         checkpoint = torch.load(path)
         net.load_state_dict(checkpoint['net'])
-        print(f"...loaded checkpoint with acc {checkpoint['acc']}")
+        print(f"...loaded checkpoint with loss {checkpoint['loss']}")
         return net
 
 class LADS(Augment):
@@ -536,7 +536,7 @@ class LADS(Augment):
     is taken from the StyleGAN-NADA paper(https://stylegan-nada.github.io). 
     """
 
-    def __init__(self, cfg, image_features, labels, group_labels, domain_labels, filenames, text_features, val_image_features, val_labels, val_group_labels,val_domain_labels, val_filenames):
+    def __init__(self, cfg, image_features, labels, group_labels, domain_labels, filenames, text_features, val_image_features, val_labels, val_group_labels,val_domain_labels, class_weights=None):
         super().__init__(cfg, image_features, labels, group_labels, domain_labels, filenames, text_features)
         source_embeddings, target_embeddings = get_domain_text_embs(self.model, cfg, self.neutral_prompts, self.prompts, self.class_names)
         # target_embeddings is size (num_domains, num_classes, emb_size)
@@ -558,18 +558,51 @@ class LADS(Augment):
         self.net_checkpoints = []
         self.uid = uuid.uuid4()
         # create generic embeddings for class consistency loss
-        if self.cfg.DATA.DATASET == 'ColoredMNISTBinary':
-            text_embs = zeroshot_classifier([[f'a photo of the number "{c}"'] for c in self.class_names], self.model, model_type=self.cfg.EXP.IMAGE_FEATURES)
-        else:
-            text_embs = zeroshot_classifier([[f"a photo of a {c}"] for c in self.class_names], self.model, model_type=self.cfg.EXP.IMAGE_FEATURES)
+        text_embs = zeroshot_classifier([[f"a photo of a {c}"] for c in self.class_names], self.model, model_type=self.cfg.EXP.IMAGE_FEATURES)
         
         self.class_text_embs = text_embs.float().cuda()
+        if class_weights is not None:
+            self.class_weights = torch.tensor(list(class_weights)).float().cuda()
+        else:
+            self.class_weights = torch.ones(len(self.class_names)).float().cuda()
         self.run() # train augmentation networks
 
     def run(self):
         for i in range(len(self.prompts)):
             print(f"Training network for {self.prompts[i]}")
             self.train_network(i)
+
+    def directional_loss_builder(self, num_net):
+        """
+        CLIP directional loss from gan NADA paper. Ensures that the difference in
+        image embeddings is similar to the difference in text embeddings of the 
+        source and target domain.
+        """
+        if not self.cfg.AUGMENTATION.GENERIC:
+            delta_t = torch.Tensor(self.text_features[num_net])
+        else:
+            delta_t = torch.Tensor(self.text_features[num_net])
+        delta_t = delta_t.type(torch.float).cuda()
+        print("delta shape ", delta_t.shape, self.text_features.shape)
+        
+        def custom_loss(predictions, labels, targets):
+            total_sum = None
+            delta_i = predictions - labels
+            ctr = 0
+            for i, l in zip(delta_i, targets): 
+                if not self.cfg.AUGMENTATION.GENERIC:
+                    delta_tt = delta_t[l]
+                else:
+                    delta_tt = delta_t
+                ctr += 1
+                if total_sum == None: 
+                    numerator = torch.dot(i, delta_tt)
+                    denominator = torch.norm(i) * torch.norm(delta_tt)
+                    total_sum = 1 - (numerator/denominator)
+                else: 
+                    total_sum += 1 - (torch.dot(i, delta_tt)/ (torch.norm(i) * torch.norm(delta_tt)))
+            return total_sum / ctr
+        return custom_loss
 
     @staticmethod
     def get_class_logits(outputs, class_embs):
@@ -582,8 +615,14 @@ class LADS(Augment):
         self.net_checkpoints.append("")
 
         self.optimizer = AdamW(self.nets[num_net].parameters(), lr=self.cfg.AUGMENTATION.MODEL.LR, weight_decay=self.cfg.AUGMENTATION.MODEL.WEIGHT_DECAY)
-        self.directional_loss = DirectionLoss(self.cfg.AUGMENTATION.LOSS_TYPE)
-        self.class_consistency_loss = nn.CrossEntropyLoss(weight=self.dataset.class_weights.cuda())
+        # self.directional_loss = DirectionLoss(self.cfg.AUGMENTATION.LOSS_TYPE)
+        self.directional_loss = self.directional_loss_builder(num_net)
+        print(self.class_weights[:5])
+        new_class_weights = self.dataset.class_weights.cuda() * self.class_weights
+        print(new_class_weights.shape, new_class_weights[:5])
+        new_class_weights = new_class_weights / new_class_weights.sum()
+        print(new_class_weights.shape, new_class_weights[:5])
+        self.class_consistency_loss = nn.CrossEntropyLoss(weight=new_class_weights)
         self.regularization_loss = nn.CrossEntropyLoss()
 
         if self.cfg.AUGMENTATION.CLIP_NN_LOSS:
@@ -599,6 +638,8 @@ class LADS(Augment):
                     best_train_loss = val_metrics['val loss']
                     best_epoch = epoch
                     self.net_checkpoints[num_net] = self.save_checkpoint(best_train_loss, epoch, num_net)
+            progress_bar(epoch+1, self.cfg.AUGMENTATION.EPOCHS, 'Epoch: %d | Train Loss: %.3f | Val Loss: %.3f'
+                            % (epoch, train_metrics['train loss'], val_metrics['val loss']))
 
         wandb.summary[f"{self.prompts[num_net]} best epoch"] = best_epoch
         wandb.summary[f"{self.prompts[num_net]} best train_loss"] = best_train_loss
@@ -623,6 +664,7 @@ class LADS(Augment):
         return diffs
 
     def training_loop(self, loader, num_net, epoch, phase='train'):
+        loader_len = len(loader)
         if phase == 'train':
             self.nets[num_net].train()
         else:
@@ -635,7 +677,8 @@ class LADS(Augment):
                 text_diffs = self.get_direction_vectors(inp, cls_target, num_net)
                 im_diffs = cls_outputs - inp
                 # compute directional loss
-                directional_loss = self.directional_loss(im_diffs / im_diffs.norm(dim=-1, keepdim=True), text_diffs).mean()
+                # directional_loss = self.directional_loss(im_diffs / im_diffs.norm(dim=-1, keepdim=True), text_diffs).mean()
+                directional_loss = self.cfg.AUGMENTATION.DOM_WEIGHT * self.directional_loss(cls_outputs, inp, cls_target)
                 cls_emb_targets = self.target_embeddings[num_net].T if self.cfg.AUGMENTATION.DOM_SPECIFIC_XE else self.class_text_embs
                 cls_logits = self.get_class_logits(cls_outputs, cls_emb_targets)
                 cls_consist = self.class_consistency_loss(cls_logits, cls_target)
@@ -651,7 +694,7 @@ class LADS(Augment):
                 train_loss += loss.item()
 
                 total += cls_target.size(0)
-                progress_bar(i, len(loader), 'Loss: %.3f'% (train_loss/(i+1)))
+                # progress_bar(i, loader_len, 'Loss: %.3f'% (train_loss/(i+1)))
 
         metrics = {f"{phase} class loss": train_class_loss/(i+1), f"{phase} directional loss": train_directional_loss/(i+1), f"{phase} loss": train_loss/(i+1), "epoch": epoch}
         wandb.log(metrics)
@@ -680,8 +723,8 @@ class LADS(Augment):
         checkpoint_dir = os.path.join("./checkpoint", self.cfg.DATA.DATASET)
         if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
-        path = f'./checkpoint/{self.cfg.DATA.DATASET}/{self.prompts[num_net]}-{self.cfg.EXP.SEED}-{self.uid}.pth'
-        print(f'Saving checkpoint with acc {acc} to {path}...')
+        path = f'./checkpoint/{self.cfg.DATA.DATASET}/{self.prompts[num_net].replace(" ", "_")}-{self.cfg.EXP.SEED}-{self.uid}.pth'
+        print(f'Saving checkpoint with acc {acc}...')
         state = {
             "acc": acc,
             "epoch": epoch,

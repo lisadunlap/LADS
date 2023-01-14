@@ -47,21 +47,15 @@ def get_domain_text_embs(model, cfg, source_text_prompts, target_text_prompts, c
             diffs = torch.stack([emb-source_embeddings[0] for emb in text_embeddings])
             diffs /= text_embeddings.norm(dim=-1, keepdim=True)
     else:
-        print(target_text_prompts)
-        # print("yo", len(source_text_prompts), len(source_text_prompts[0]))
-        # go on a per class basis
         templates = target_text_prompts
         all_texts = []
         for t in source_text_prompts:
             texts = [[t.format(c)] for c in class_names]
             text_emb = zeroshot_classifier(texts, model, normalize=cfg.METHOD.NORMALIZE, model_type=cfg.EXP.IMAGE_FEATURES).T
-            print(texts, "text_emb", text_emb.shape)
             all_texts.append(text_emb)
         if type(target_text_prompts[0]) == str:
             target_text_prompts = [target_text_prompts]
-        print(target_text_prompts)
         for p in target_text_prompts:
-            print(p)
             texts = [[t.format(c) for t in p] for c in class_names]
             text_emb = zeroshot_classifier(texts, model, normalize=cfg.METHOD.NORMALIZE, model_type=cfg.EXP.IMAGE_FEATURES).T
             all_texts.append(text_emb)

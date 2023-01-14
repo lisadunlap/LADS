@@ -6,8 +6,11 @@ Official Implementation of [LADS (Latent Augmentation using Domain descriptionS)
 *WARNING: this is still WIP, please raise an issue if you run into any bugs.*
 
 ## TODOs
-[] add e2e method for DA
-[] add in selective augmentation (run lp, check per class acc, augment poor performing finetuned classes more towards the text emb)
+[X] clean up emb saving/loading
+[] fix the Directional vs LADS acc diff
+[X] add e2e method for DA
+[] get E2E to work well
+[X] add in selective augmentation (run lp, check per class acc, augment poor performing finetuned classes more towards the text emb)
 [] run 2 layer mlp baselines
 
 ## Getting started

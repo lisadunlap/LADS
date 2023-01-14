@@ -11,7 +11,7 @@ EXP:
   CLIP_MODEL: 'ViT-L/14'
   IMAGE_FEATURES: 'clip'
   AUGMENTATION: None
-  ENSAMBLE: True
+  ENSAMBLE: False
   CLIP_PRETRAINED_DATASET: 'openai'
   BIASED_VAL: True
 
@@ -19,7 +19,7 @@ DATA:
   DATASET: "Waterbirds95"
   BATCH_SIZE: 256
   LOAD_CACHED: True
-  SAVE_PATH: 'data/waterbirds/em.pth'
+  SAVE_PATH: 'embeddings'
   UPWEIGHT_DOMAINS: False
   UPWEIGHT_CLASSES: True
   MODEL_DIM: 1024

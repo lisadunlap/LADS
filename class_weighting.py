@@ -131,6 +131,13 @@ zs_val_accuracy, zs_val_balanced_acc, zs_val_class_accuracy, zs_val_group_accura
 log_wandb(lp_val_accuracy, lp_val_balanced_acc, lp_val_class_accuracy, lp_val_group_accuracy, tag='lp_val')
 log_wandb(zs_val_accuracy, zs_val_balanced_acc, zs_val_class_accuracy, zs_val_group_accuracy, tag='zs_val')
 
+lp_test_predictions, lp_test_probs = lp.eval(test_features)
+zs_test_predictions, zs_test_probs = zs.eval(test_features)
+lp_test_accuracy, lp_test_balanced_acc, lp_test_class_accuracy, lp_test_group_accuracy = evaluate(lp_test_predictions, test_labels, np.squeeze(test_groups))
+zs_test_accuracy, zs_test_balanced_acc, zs_test_class_accuracy, zs_test_group_accuracy = evaluate(zs_test_predictions, test_labels, np.squeeze(test_groups))
+log_wandb(lp_test_accuracy, lp_test_balanced_acc, lp_test_class_accuracy, lp_test_group_accuracy, tag='lp_test')
+log_wandb(zs_test_accuracy, zs_test_balanced_acc, zs_test_class_accuracy, zs_test_group_accuracy, tag='zs_test')
+
 print('..........................................')
 print(f"LP val accuracy: {lp_val_accuracy} \t ZS val accuracy: {zs_val_accuracy}")
 # acc_diff = lp_val_class_accuracy - zs_val_class_accuracy

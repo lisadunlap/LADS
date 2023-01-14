@@ -7,7 +7,8 @@ EXP:
   NEUTRAL_TEXT_PROMPTS: ['a photo of a {} bird.']
   EPOCHS: 200
   LOG_HIST: False
-  ENSAMBLE: True
+  ENSAMBLE: False
+  LOG_NN: False
   
   
 DATA:
@@ -33,12 +34,12 @@ AUGMENTATION:
     NUM_LAYERS: 2
   LOSS_TYPE: 'cosine'
   SQUARE_LOSS: False
-  DOM_WEIGHT: 1
+  DOM_WEIGHT: 2
   ALPHA: 0.5
   GENERIC: False
   DOM_LABELS: ['painting']
   RANDOMIZE_PROB: 1.0
   RANDOMIZE: False
-  REG_WEIGHT: 0.1
+  REG_WEIGHT: 0.0
   CC_WEIGHT: 1.0
   CYCLE_GAN_WEIGHT: 0.0

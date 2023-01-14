@@ -1,0 +1,21 @@
+EXP:
+  ADVICE_METHOD: "CLIPZS"
+  WANDB_SILENT: False
+  PROJ: "LADS_ZS"
+  SEED: 0
+  TEXT_PROMPTS: ['a painting of a {} bird.']
+  NEUTRAL_TEXT_PROMPTS: ['a photo of a {} bird.']
+  EPOCHS: 400
+  CHECKPOINT_VAL: True
+  TEMPLATES: 'cub_template'
+
+DATA:
+  DATASET: "CUB"
+  BATCH_SIZE: 256
+
+METHOD:
+  MODEL:
+    NUM_LAYERS: 1
+    LR: 0.0005
+    WEIGHT_DECAY: 0.05
+    CHECKPOINT_NAME: 'cub_lp'

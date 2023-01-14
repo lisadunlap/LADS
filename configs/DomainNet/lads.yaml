@@ -14,7 +14,6 @@ EXP:
 DATA:
   DATASET: "DomainNetMini"
   LOAD_CACHED: True
-  SAVE_PATH: "vit14_clip.pth"
   BATCH_SIZE: 256
 
 METHOD:

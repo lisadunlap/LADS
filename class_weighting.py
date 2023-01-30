@@ -72,7 +72,7 @@ if args.DATA.LOAD_CACHED:
         model_name = args.EXP.CLIP_MODEL
     else:
         model_name = args.EXP.IMAGE_FEATURES
-    cache_file, dataset_classes, dataset_domains = dh.get_cache_file(DATASET_NAME, model_name, args.EXP.BIASED_VAL, args.EXP.IMAGE_FEATURES)
+    cache_file, dataset_classes, dataset_domains = dh.get_cache_file(DATASET_NAME, model_name, args.EXP.IMAGE_FEATURES)
     assert os.path.exists(cache_file), f"{cache_file} does not exist. To compute embeddings, set DATA.LOAD_CACHED=False"
     data = torch.load(cache_file)
     train_features, train_labels, train_groups, train_domains, train_filenames = data['train_features'], data['train_labels'], data['train_groups'], data['train_domains'], data['train_filenames']
@@ -138,14 +138,31 @@ zs_test_accuracy, zs_test_balanced_acc, zs_test_class_accuracy, zs_test_group_ac
 log_wandb(lp_test_accuracy, lp_test_balanced_acc, lp_test_class_accuracy, lp_test_group_accuracy, tag='lp_test')
 log_wandb(zs_test_accuracy, zs_test_balanced_acc, zs_test_class_accuracy, zs_test_group_accuracy, tag='zs_test')
 
+# print('..........................................')
+# print(f"LP val accuracy: {lp_val_accuracy} \t ZS val accuracy: {zs_val_accuracy}")
+# # acc_diff = lp_val_class_accuracy - zs_val_class_accuracy
+# # print(lp_val_class_accuracy + zs_val_class_accuracy)
+# test = (zs_val_class_accuracy - lp_val_class_accuracy) / (lp_val_class_accuracy + zs_val_class_accuracy)
+# print(f"--------------- test {test[:10]} {test.shape} np sum {np.count_nonzero(np.isnan(test))}")
+# acc_prop = np.nan_to_num((zs_val_class_accuracy - lp_val_class_accuracy) / (lp_val_class_accuracy + zs_val_class_accuracy), nan=0.5)
+# print(f"--------------- acc prop {acc_prop} {type(acc_prop)} {acc_prop.shape} np sum {np.sum(acc_prop)}")
+# class_weights = acc_prop - np.min(acc_prop)
+# class_weights = acc_prop / np.sum(acc_prop)
+# print(f"Accuracy difference: {class_weights[:10]} \t Accuracy proportion: {acc_prop[:10]} {np.sum(acc_prop)}")
+# print('..........................................')
+
 print('..........................................')
-print(f"LP val accuracy: {lp_val_accuracy} \t ZS val accuracy: {zs_val_accuracy}")
-# acc_diff = lp_val_class_accuracy - zs_val_class_accuracy
-# print(lp_val_class_accuracy + zs_val_class_accuracy)
-acc_prop = np.nan_to_num(zs_val_class_accuracy / (lp_val_class_accuracy + zs_val_class_accuracy), nan=0.5)
-print(f"--------------- acc prop {acc_prop} {type(acc_prop)} {acc_prop.shape} np sum {np.sum(acc_prop)}")
-class_weights = acc_prop / np.sum(acc_prop)
-print(f"Accuracy difference: {class_weights[:10]} \t Accuracy proportion: {acc_prop[:10]} {np.sum(acc_prop)}")
+print("Double the weights of the classes that are more accurate with ZS")
+acc_diff = lp_val_class_accuracy - zs_val_class_accuracy
+class_weights = np.ones(len(acc_diff))
+# class_weights[acc_diff > 0] = 1 + acc_diff[acc_diff > 0]
+# class_weights /= np.sum(class_weights)
+alpha = zs_val_balanced_acc / (zs_val_balanced_acc + lp_val_balanced_acc)
+print("OLD ALPHA ", args.AUGMENTATION.ALPHA, type(alpha))
+print(args)
+OmegaConf.update(args, "AUGMENTATION.ALPHA", float(alpha), merge=False)
+print("NEW ALPHA ", args.AUGMENTATION.ALPHA)
+print(f"Alpha: {alpha} Accuracy difference: {class_weights[:10]} \t Accuracy proportion: {class_weights[:10]} {np.sum(class_weights)}")
 print('..........................................')
 
 old_val_features, old_val_labels, old_val_groups, old_val_domains, old_val_filenames = val_features, val_labels, val_groups, val_domains, val_filenames
@@ -190,9 +207,16 @@ if args.EXP.AUGMENTATION != None and args.EXP.AUGMENTATION != 'None':
 
 # retrain the model on the augmented dataset
 lp.train_debias(train_features, train_labels, train_groups, train_domains, val_features, val_labels, np.squeeze(val_groups), val_domains)
-lp_val_predictions, lp_val_probs = lp.eval(val_features)
-lp_val_accuracy, lp_val_balanced_acc, lp_val_class_accuracy, lp_val_group_accuracy = evaluate(lp_val_predictions, val_labels, np.squeeze(val_groups))
-log_wandb(lp_val_accuracy, lp_val_balanced_acc, lp_val_class_accuracy, lp_val_group_accuracy, tag='aug_lp_val')
-lp_test_predictions, lp_test_probs = lp.eval(test_features)
-lp_test_accuracy, lp_test_balanced_acc, lp_test_class_accuracy, lp_test_group_accuracy = evaluate(lp_test_predictions, test_labels, np.squeeze(test_groups))
-log_wandb(lp_test_accuracy, lp_test_balanced_acc, lp_test_class_accuracy, lp_test_group_accuracy, tag='aug_lp_test')
+zs_lp_val_predictions, zs_lp_val_probs = lp.eval(val_features)
+zs_lp_val_accuracy, zs_lp_val_balanced_acc, zs_lp_val_class_accuracy, zs_lp_val_group_accuracy = evaluate(zs_lp_val_predictions, val_labels, np.squeeze(val_groups))
+log_wandb(zs_lp_val_accuracy, zs_lp_val_balanced_acc, zs_lp_val_class_accuracy, zs_lp_val_group_accuracy, tag='aug_lp_val')
+zs_lp_test_predictions, zs_lp_test_probs = lp.eval(test_features)
+zs_lp_test_accuracy, zs_lp_test_balanced_acc, zs_lp_test_class_accuracy, zs_lp_test_group_accuracy = evaluate(zs_lp_test_predictions, test_labels, np.squeeze(test_groups))
+log_wandb(zs_lp_test_accuracy, zs_lp_test_balanced_acc, zs_lp_test_class_accuracy, zs_lp_test_group_accuracy, tag='aug_lp_test')
+
+
+results = {'class weights': class_weights, 
+    'zs_val': zs_val_class_accuracy, 'lp_val': lp_val_class_accuracy, 'zs_lp_aug_val': zs_lp_val_class_accuracy,
+    'zs_test': zs_test_class_accuracy, 'lp_test': lp_test_class_accuracy, 'zs_lp_aug_test': zs_lp_test_class_accuracy,
+    "zs_lp_test_group_accuracy": zs_lp_test_group_accuracy}
+np.save(f"results/{args.DATA.DATASET}_class_accuracies_change_alpha.npy", results)

@@ -1,7 +1,7 @@
 EXP:
-  ADVICE_METHOD: "ClipMLP"
+  ADVICE_METHOD: "AugE2EMLPMulti"
   WANDB_SILENT: False
-  PROJ: "DomainNetMini_LADS_Replication"
+  PROJ: "DomainNetMini_LADS_e2e"
   SEED: 0
   TEXT_PROMPTS: ['clipart of a {}.', 'a painting of a {}.', 'a realistic photo of a {}.']
   NEUTRAL_TEXT_PROMPTS: ['a sketch of a {}']

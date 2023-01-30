@@ -26,7 +26,7 @@ except:
     progress_bar = lambda current, total, msg: None
 
 import uuid
-
+import methods.predictors as models
 from methods.predictors import MLP, MPLZS
 from clip_utils import zeroshot_classifier, evaluate
 from methods.lads_utils import get_domain_text_embs, EmbeddingDataset, DirectionLoss
@@ -59,7 +59,9 @@ class Base:
         source_embeddings, target_embeddings = get_domain_text_embs(self.model, cfg, self.neutral_prompts, self.target_prompts, self.class_names)
         # target_embeddings is size (num_domains, num_classes, emb_size)
         # source_embeddings is size (num_source_domain_descriptions, num_classes, emb_size)
-        if source_embeddings.shape[0] > 1:
+        if len(source_embeddings) == 0 or len(target_embeddings) == 0:
+            self.text_embeddings = []
+        elif source_embeddings.shape[0] > 1:
             self.text_embeddings = target_embeddings - source_embeddings.mean(axis=0)
         else:
             self.text_embeddings = target_embeddings - source_embeddings
@@ -122,7 +124,7 @@ class ClipMLP(Base):
         B, W  = inputs.shape
         self.model_conf = OmegaConf.create({"in_dim": W, "h_dim": self.cfg.METHOD.MODEL.HIDDEN_DIM, "out_dim": self.train_dataset.num_classes, "num_classes": self.train_dataset.num_classes, "num_domains": self.train_dataset.num_domains, "num_layers": self.cfg.METHOD.MODEL.NUM_LAYERS})
         self.cfg = OmegaConf.merge(self.cfg, self.model_conf)
-        net = MLP(self.cfg)
+        net = getattr(models, self.cfg.METHOD.MODEL.ARCH)(self.cfg)
         self.net = net.cuda()
         net = torch.nn.DataParallel(self.net)
         cudnn.benchmark = True
@@ -312,7 +314,7 @@ class AugE2EMLPMulti(ClipMLP):
             self.val_dom_check = torch.transpose(self.val_dom_check, 0, 1)
             print("val domain check shape ", self.val_dom_check.shape, self.class_text_embs.shape)
         except:
-            print("can't load prompts")
+            print(f"Can't load prompts {self.text_prompts} and {self.neutral_prompts} into CLIP text encoder")
 
     @staticmethod
     def get_class_logits(outputs, class_embs):
@@ -344,13 +346,13 @@ class AugE2EMLPMulti(ClipMLP):
         B, W  = inputs.shape
         self.model_conf = OmegaConf.create({"in_dim": W, "h_dim": W, "out_dim": self.train_dataset.num_classes, "num_classes": self.train_dataset.num_classes, "num_domains": self.train_dataset.num_domains, "num_layers": self.cfg.METHOD.MODEL.NUM_LAYERS})
         self.cfg = OmegaConf.merge(self.cfg, self.model_conf)
-        net = MLP(self.cfg)
+        net = getattr(models, self.cfg.METHOD.MODEL.ARCH)(self.cfg)
         self.net = net.cuda()
         # net = torch.nn.DataParallel(self.net)
         cudnn.benchmark = True
         self.augmentation_model_conf = OmegaConf.create({"in_dim": W, "h_dim": self.cfg.AUGMENTATION.MODEL.HIDDEN_DIM, "out_dim": W, "num_classes": self.train_dataset.num_classes, "num_layers": self.cfg.AUGMENTATION.MODEL.NUM_LAYERS})
         self.num_domains = len(self.text_embeddings)
-        aug_net = nn.ModuleList([MLP(OmegaConf.merge(self.cfg, self.augmentation_model_conf)) for i in range(self.num_domains)])
+        aug_net = nn.ModuleList([getattr(models, self.cfg.AUGMENTATION.MODEL.ARCH)(OmegaConf.merge(self.cfg, self.augmentation_model_conf)) for i in range(self.num_domains)])
         self.aug_net = aug_net.cuda()
         # self.aug_net = torch.nn.DataParallel(self.aug_net)
         wandb.watch(aug_net, log_freq=10)

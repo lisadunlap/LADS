@@ -35,6 +35,9 @@ def get_domain_text_embs(model, cfg, source_text_prompts, target_text_prompts, c
     If generic is True, source_text_prompts and target_text_prompts are strings instead of 
     templates to put the class name in. 
     """
+    print("len of prompts ", target_text_prompts, len(target_text_prompts), source_text_prompts, len(source_text_prompts))
+    if len(target_text_prompts) == 0 or len(source_text_prompts) == 0:
+        return [], []
     if cfg.AUGMENTATION.GENERIC:
         text_embeddings = zeroshot_classifier(target_text_prompts, model, normalize=cfg.METHOD.NORMALIZE, model_type=cfg.EXP.IMAGE_FEATURES)
         text_embeddings = np.transpose(text_embeddings, (1,0))

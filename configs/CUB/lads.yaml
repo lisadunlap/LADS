@@ -6,7 +6,7 @@ EXP:
   TEXT_PROMPTS: ['a painting of a {} bird.']
   NEUTRAL_TEXT_PROMPTS: ['a photo of a {} bird.']
   AUGMENTATION: 'LADS'
-  EPOCHS: 400
+  EPOCHS: 200
   ENSAMBLE: True
   
   
@@ -17,7 +17,7 @@ DATA:
 
 METHOD:
   MODEL:
-    NUM_LAYERS: 2
+    NUM_LAYERS: 1
     DOM_WEIGHT: 1.0
     LR: 0.001
     WEIGHT_DECAY: 0.05

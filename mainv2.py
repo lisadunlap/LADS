@@ -37,7 +37,7 @@ if len(unknown) > 0:
 args.yaml = flags.config
 
 assert args.EXP.ADVICE_METHOD != 'CNN', "main.py not for CNN baseline, use train.py"
-# assert args.EXP.ADVICE_METHOD != 'CLIPZS', "main.py not for CLIP zero-shot, use clip_zs.py"
+assert args.EXP.ADVICE_METHOD != 'CLIPZS', "main.py not for CLIP zero-shot, use clip_zs.py"
 
 if args.EXP.WANDB_SILENT:
     os.environ['WANDB_SILENT']="true"
@@ -55,11 +55,6 @@ def flatten_config(dic, running_key=None, flattened_dict={}):
             flattened_dict[running_key_temp] = value
     return flattened_dict
 
-if args.EXP.DEBUG:
-    # only run for a few epochs
-    args.EXP.EPOCHS = 1
-    args.AUGMENTATION.EPOCHS = 1
-
 run = wandb.init(project=args.EXP.PROJ, group=args.EXP.ADVICE_METHOD, config=flatten_config(args), allow_val_change=False)
 # wandb.save(flags.config)
 # wandb.run.log_code(".")
@@ -70,8 +65,40 @@ random.seed(args.EXP.SEED)
 
 DATASET_NAME = args.DATA.DATASET
 
+cache_file = f"{args.DATA.SAVE_PATH}/{args.DATA.DATASET}/{args.EXP.IMAGE_FEATURES}_{args.EXP.CLIP_PRETRAINED_DATASET}_{args.EXP.CLIP_MODEL.replace('/','_')}.pt"
+dataset_classes, dataset_domains = dh.DATASET_CLASSES[args.DATA.DATASET], dh.DATASET_DOMAINS[args.DATA.DATASET]
+print("CACHE DILE ", cache_file)
+if os.path.exists(cache_file):
+    print(f"Loading cached embeddings from {cache_file}")
+    train_features, train_labels, train_groups, train_domains, train_filenames, val_features, val_labels, val_groups, val_domains, val_filenames, test_features, test_labels, test_groups, test_domains, test_filenames = load_embeddings(cache_file, args.DATA.DATASET)
+    if args.METHOD.NORMALIZE:
+        train_features /= np.linalg.norm(train_features, axis=-1, keepdims=True)
+        val_features /= np.linalg.norm(val_features, axis=-1, keepdims=True)
+        test_features /= np.linalg.norm(test_features, axis=-1, keepdims=True)
+# load data
+# if args.DATA.LOAD_CACHED:
+#     print(args.DATA.LOAD_CACHED)
+#     if args.EXP.IMAGE_FEATURES == 'clip' or args.EXP.IMAGE_FEATURES == 'openclip':
+#         model_name = args.EXP.CLIP_MODEL
+#     else:
+#         model_name = args.EXP.IMAGE_FEATURES
+#     cache_file, dataset_classes, dataset_domains = dh.get_cache_file(DATASET_NAME, model_name, args.EXP.IMAGE_FEATURES)
+#     assert os.path.exists(cache_file), f"{cache_file} does not exist. To compute embeddings, set DATA.LOAD_CACHED=False"
+#     data = torch.load(cache_file)
+#     train_features, train_labels, train_groups, train_domains, train_filenames = data['train_features'], data['train_labels'], data['train_groups'], data['train_domains'], data['train_filenames']
+#     val_features, val_labels, val_groups, val_domains, val_filenames = data['val_features'], data['val_labels'], data['val_groups'], data['val_domains'], data['val_filenames']
+#     test_features, test_labels, test_groups, test_domains, test_filenames = data['test_features'], data['test_labels'], data['test_groups'], data['test_domains'], data['test_filenames']
+#     # move some val data to test 
+#     if args.DATA.DATASET != 'ColoredMNISTBinary':
+#         val_features, val_labels, val_groups, val_domains, val_filenames = data['val_features'][::2], data['val_labels'][::2], data['val_groups'][::2], data['val_domains'][::2], data['val_filenames'][::2]
+#         test_features, test_labels, test_groups, test_domains, test_filenames = np.concatenate((data['test_features'], data['val_features'][1::2])), np.concatenate((data['test_labels'], data['val_labels'][1::2])), np.concatenate((data['test_groups'], data['val_groups'][1::2])), np.concatenate((data['test_domains'], data['val_domains'][1::2])), np.concatenate((data['test_filenames'], data['val_filenames'][1::2]))
+#     if args.METHOD.NORMALIZE:
+#         train_features /= np.linalg.norm(train_features, axis=-1, keepdims=True)
+#         val_features /= np.linalg.norm(val_features, axis=-1, keepdims=True)
+#         test_features /= np.linalg.norm(test_features, axis=-1, keepdims=True)
 # Load the model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(args.EXP.IMAGE_FEATURES)
 # clip_model, preprocess = clip.load(args.EXP.CLIP_MODEL, device)
 if args.EXP.IMAGE_FEATURES == 'clip':
     clip_model, preprocess = clip.load(args.EXP.CLIP_MODEL, device)
@@ -84,48 +111,6 @@ else:
     model = getattr(torchvision.models, args.EXP.IMAGE_FEATURES)(pretrained=True)
     model = model.to(device)
 
-# # load data
-if args.DATA.LOAD_CACHED:
-    cache_file = f"{args.DATA.SAVE_PATH}/{args.DATA.DATASET}/{args.EXP.IMAGE_FEATURES}_{args.EXP.CLIP_PRETRAINED_DATASET}_{args.EXP.CLIP_MODEL.replace('/','_')}.pt"
-    dataset_classes, dataset_domains = dh.DATASET_CLASSES[args.DATA.DATASET], dh.DATASET_DOMAINS[args.DATA.DATASET]
-    assert os.path.exists(cache_file), f"{cache_file} does not exist. To compute embeddings, set DATA.LOAD_CACHED=False"
-    print(f"Loading cached embeddings from {cache_file}")
-    train_features, train_labels, train_groups, train_domains, train_filenames, val_features, val_labels, val_groups, val_domains, val_filenames, test_features, test_labels, test_groups, test_domains, test_filenames = load_embeddings(cache_file, args.DATA.DATASET)
-# cache_file = f"{args.DATA.SAVE_PATH}/{args.DATA.DATASET}/{args.EXP.IMAGE_FEATURES}_{args.EXP.CLIP_PRETRAINED_DATASET}_{args.EXP.CLIP_MODEL.replace('/','_')}.pt"
-# dataset_classes, dataset_domains = dh.DATASET_CLASSES[args.DATA.DATASET], dh.DATASET_DOMAINS[args.DATA.DATASET]
-# if os.path.exists(cache_file):
-#     print(f"Loading cached embeddings from {cache_file}")
-#     train_features, train_labels, train_groups, train_domains, train_filenames, val_features, val_labels, val_groups, val_domains, val_filenames, test_features, test_labels, test_groups, test_domains, test_filenames = load_embeddings(cache_file, args.DATA.DATASET)
-else:
-    # print(f"Computing embeddings and saving to {cache_file}")
-    trainset, valset, testset = dh.get_dataset(DATASET_NAME, preprocess)
-    dataset_classes, dataset_domains = dh.get_class(DATASET_NAME), dh.get_domain(DATASET_NAME)
-    train_loader = torch.utils.data.DataLoader(trainset, batch_size=cfg.DATA.BATCH_SIZE, shuffle=True)
-    val_loader = torch.utils.data.DataLoader(valset, batch_size=cfg.DATA.BATCH_SIZE, shuffle=False)
-    test_loader = torch.utils.data.DataLoader(testset, batch_size=cfg.DATA.BATCH_SIZE, shuffle=False)
-    train_features, train_labels, train_groups, train_domains, train_filenames = get_features(train_loader, model, device, model_type=args.EXP.IMAGE_FEATURES)
-    val_features, val_labels, val_groups, val_domains, val_filenames = get_features(val_loader, model, device, model_type=args.EXP.IMAGE_FEATURES)
-    test_features, test_labels, test_groups, test_domains, test_filenames = get_features(test_loader, model, device, model_type=args.EXP.IMAGE_FEATURES)
-    if args.DATA.DATASET != 'ColoredMNISTBinary':
-        val_features, val_labels, val_groups, val_domains, val_filenames = val_features[::2], val_labels[::2], val_groups[::2], val_domains[::2], val_filenames[::2]
-        test_features, test_labels, test_groups, test_domains, test_filenames = np.concatenate((test_features, val_features[1::2])), np.concatenate((test_labels, val_labels[1::2])), np.concatenate((test_groups, val_groups[1::2])), np.concatenate((test_domains, val_domains[1::2])), np.concatenate((test_filenames, val_filenames[1::2]))
-    save_dict = {
-        "train_features": train_features, "train_labels": train_labels, "train_groups": train_groups, "train_domains": train_domains, "train_filenames": train_filenames,
-        "val_features": val_features, "val_labels": val_labels, "val_groups": val_groups, "val_domains": val_domains, "val_filenames": val_filenames,
-        "test_features": test_features, "test_labels": test_labels, "test_groups": test_groups, "test_domains": test_domains, "test_filenames": test_filenames,
-        "seed": args.EXP.SEED
-    }
-    if not os.path.exists(f"{args.DATA.SAVE_PATH}/{args.DATA.DATASET}"):
-        os.makedirs(f"{args.DATA.SAVE_PATH}/{args.DATA.DATASET}")
-    cache_file = f"{args.DATA.SAVE_PATH}/{args.DATA.DATASET}/{args.EXP.IMAGE_FEATURES}_{args.EXP.CLIP_PRETRAINED_DATASET}_{args.EXP.CLIP_MODEL.replace('/','_')}.pt"
-    torch.save(save_dict, cache_file)
-    print(f"Saved CLIP embeddings to {cache_file}")
-
-if args.METHOD.NORMALIZE:
-    train_features /= np.linalg.norm(train_features, axis=-1, keepdims=True)
-    val_features /= np.linalg.norm(val_features, axis=-1, keepdims=True)
-    test_features /= np.linalg.norm(test_features, axis=-1, keepdims=True)
-
 # Calculate the image features
 prompts = list(args.EXP.TEXT_PROMPTS)
 if len(prompts) >0 and type(prompts[0]) == omegaconf.listconfig.ListConfig:
@@ -136,11 +121,39 @@ if len(neutral_prompts) >0 and type(neutral_prompts[0]) == omegaconf.listconfig.
     neutral_prompts = [list(p) for p in neutral_prompts]
 print("Advice Method", args.EXP.ADVICE_METHOD)
 bias_correction = getattr(CLIPTransformations, args.EXP.ADVICE_METHOD)(prompts, clip_model, args, neutral_prompts)
+if args.DATA.LOAD_CACHED ==  False:
+    trainset, valset, testset = dh.get_dataset(DATASET_NAME, preprocess, biased_val=args.EXP.BIASED_VAL)
+    dataset_classes = dh.get_class(DATASET_NAME)
+    dataset_domains = dh.get_domain(DATASET_NAME)
+    train_loader = torch.utils.data.DataLoader(trainset, batch_size=cfg.DATA.BATCH_SIZE, shuffle=True)
+    val_loader = torch.utils.data.DataLoader(valset, batch_size=cfg.DATA.BATCH_SIZE, shuffle=False)
+    test_loader = torch.utils.data.DataLoader(testset, batch_size=cfg.DATA.BATCH_SIZE, shuffle=False)
+    train_features, train_labels, train_groups, train_domains, train_filenames = get_features(train_loader, model, device, model_type=args.EXP.IMAGE_FEATURES)
+    val_features, val_labels, val_groups, val_domains, val_filenames = get_features(val_loader, model, device, model_type=args.EXP.IMAGE_FEATURES)
+    test_features, test_labels, test_groups, test_domains, test_filenames = get_features(test_loader, model, device, model_type=args.EXP.IMAGE_FEATURES)
+    data = {
+        "train_features": train_features, "train_labels": train_labels, "train_groups": train_groups, "train_domains": train_domains, "train_filenames": train_filenames,
+        "val_features": val_features, "val_labels": val_labels, "val_groups": val_groups, "val_domains": val_domains, "val_filenames": val_filenames,
+        "test_features": test_features, "test_labels": test_labels, "test_groups": test_groups, "test_domains": test_domains, "test_filenames": test_filenames
+    }
+    data_dir = '/'.join(args.DATA.SAVE_PATH.split('/')[:-1])
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+    torch.save(data, args.DATA.SAVE_PATH)
+    if args.METHOD.NORMALIZE:
+        train_features /= np.linalg.norm(train_features, axis=-1, keepdims=True)
+        val_features /= np.linalg.norm(val_features, axis=-1, keepdims=True)
+        test_features /= np.linalg.norm(test_features, axis=-1, keepdims=True)
+    if args.DATA.DATASET != 'ColoredMNISTBinary':
+        val_features, val_labels, val_groups, val_domains, val_filenames = data['val_features'][::2], data['val_labels'][::2], data['val_groups'][::2], data['val_domains'][::2], data['val_filenames'][::2]
+        test_features, test_labels, test_groups, test_domains, test_filenames = np.concatenate((data['test_features'], data['val_features'][1::2])), np.concatenate((data['test_labels'], data['val_labels'][1::2])), np.concatenate((data['test_groups'], data['val_groups'][1::2])), np.concatenate((data['test_domains'], data['val_domains'][1::2])), np.concatenate((data['test_filenames'], data['val_filenames'][1::2]))
 
-# old_train_features, old_train_labels, old_train_groups, old_train_domains, old_train_filenames = train_features, train_labels, train_groups, train_domains, train_filenames
+old_train_features, old_train_labels, old_train_groups, old_train_domains, old_train_filenames = train_features, train_labels, train_groups, train_domains, train_filenames
 old_val_features, old_val_labels, old_val_groups, old_val_domains, old_val_filenames = val_features, val_labels, val_groups, val_domains, val_filenames
 old_test_features, old_test_labels, old_test_groups, old_test_domains, old_test_filenames = test_features, test_labels, test_groups, test_domains, test_filenames
 
+
+print("SIZE of embeddings ", old_train_features.shape)
 # set zeroshot weights if doing a ensamble
 if args.EXP.ENSAMBLE:
     all_prompts = neutral_prompts + prompts
@@ -152,17 +165,20 @@ if args.EXP.ENSAMBLE:
 
 # if we want to do any augmentations, do them here
 num_augmentations = 1
+print("SIZE of embeddings ", train_features.shape, train_domains.shape)
 if args.EXP.AUGMENTATION != None and args.EXP.AUGMENTATION != 'None':
     print("Augmenting training set...")
     if "LADS" in args.EXP.AUGMENTATION or 'Directional' in args.EXP.AUGMENTATION:
-        augment = getattr(methods.augmentations, args.EXP.AUGMENTATION)(args, train_features, train_labels, train_groups, train_domains, train_filenames, bias_correction.text_embeddings, val_features, val_labels, val_groups, val_domains)
+        augment = getattr(methods.augmentations, args.EXP.AUGMENTATION)(args, train_features, train_labels, train_groups, train_domains, train_filenames, bias_correction.text_embeddings, val_features, val_labels, val_groups, val_domains, val_filenames)
     else:
         augment = getattr(methods.augmentations, args.EXP.AUGMENTATION)(args, train_features, train_labels, train_groups, train_domains, train_filenames, bias_correction.text_embeddings)
     train_features, train_labels, train_domains, train_groups, train_filenames = augment.augment_dataset()
     print("Training set augmented!")
+print("SIZE of embeddings ", train_features.shape, train_domains.shape)
 
 if args.EXP.LOG_NN:
         features, labels, groups, domains, filenames = np.concatenate([old_val_features, old_test_features]), np.concatenate([old_val_labels, old_test_labels]), np.concatenate([old_val_groups, old_test_groups]), np.concatenate([old_val_domains, old_test_domains]), np.concatenate([old_val_filenames, old_test_filenames])
+        # features, labels, groups, domains, filenames = old_test_features, old_test_labels, old_test_groups, old_test_domains, old_test_filenames
         if len(np.unique(train_domains)) > 1:
             filtered_idxs = np.where(train_domains != train_domains[0])
             sample_features, sample_domains, sample_labels, sample_filenames = np.array(train_features[filtered_idxs]), train_domains[filtered_idxs], train_labels[filtered_idxs], train_filenames[filtered_idxs]
@@ -192,14 +208,14 @@ if args.EXP.LOG_NN:
 bias_correction.train_debias(train_features, train_labels, train_groups, train_domains, val_features, val_labels, np.squeeze(val_groups), val_domains)
 if args.EXP.ENSAMBLE:
     print("Ensambling predictions")
-    predictions, probs = bias_correction.eval(val_features)
+    predictions, probs = bias_correction.eval(val_features, ret_probs=True)
     lads_preds, zs_preds, ensamble_predictions, combined_preds = get_ensamble_preds(val_features, probs, zeroshot_weights, dataset_domains=dom_zeroshot_weights)
     non_overlap, non_overlap_prop, non_overlap_prop_correct = get_pred_overlap(lads_preds, zs_preds, val_labels)
     accuracy, balanced_acc, class_accuracy, group_accuracy = evaluate(ensamble_predictions, val_labels, np.squeeze(val_groups), num_augmentations=num_augmentations)
     wandb.summary["ensamble val acc"] = accuracy
     wandb.summary["ensamble val blanced acc"] = balanced_acc
 
-    predictions, probs = bias_correction.eval(test_features)
+    predictions, probs = bias_correction.eval(test_features, ret_probs=True)
     lads_preds, zs_preds, ensamble_predictions, combined_preds = get_ensamble_preds(test_features, probs, zeroshot_weights, dataset_domains=dom_zeroshot_weights)
     non_overlap, non_overlap_prop, non_overlap_prop_correct = get_pred_overlap(lads_preds, zs_preds, test_labels)
     accuracy, balanced_acc, class_accuracy, group_accuracy = evaluate(ensamble_predictions, test_labels, np.squeeze(test_groups), num_augmentations=num_augmentations)
@@ -228,15 +244,17 @@ print(f"Test accuracy: {group_accuracy} \n Test domain accuracy: {domain_accurac
 
 if 'E2E' in args.EXP.ADVICE_METHOD:
     # features, labels, groups, domains, filenames = np.concatenate([old_val_features, old_test_features]), np.concatenate([old_val_labels, old_test_labels]), np.concatenate([old_val_groups, old_test_groups]), np.concatenate([old_val_domains, old_test_domains]), np.concatenate([old_val_filenames, old_test_filenames])
-    aug_features, aug_labels, aug_domains, aug_filenames = bias_correction.augment_dataset(train_features, train_labels, train_domains, train_filenames)
+    aug_features, aug_labels, aug_domains, aug_filenames = bias_correction.augment_dataset(train_features, train_labels, train_domains)
     sample_idxs = random.sample(list(range(len(aug_filenames))), 1000)
     # print("SAMPLE SHAPE: ", sample_filenames.shape, sample_domains.shape)
     sample_features, sample_domains, sample_labels, sample_filenames = aug_features[sample_idxs], aug_domains[sample_idxs], aug_labels[sample_idxs], aug_filenames[sample_idxs]
+    print("UNIQUE DOMAINS ", np.unique(aug_domains))
     neighbor_domains, neighbor_labels, domain_acc, class_acc, neighbor_samples, prop_unique, mean_cs = get_nn_metrics(sample_features, sample_domains, sample_labels, old_test_features, old_test_domains, old_test_labels)
     wandb.log({"mean CS for NN": mean_cs})
     print(neighbor_samples)
     plt.rcParams["figure.figsize"] = (20,5)
     f, (axs_orig, axs_new) = plt.subplots(2, 10, sharey=True)
+    print("DATASET DOMAIN ", dataset_domains)
     for i, (original_idx, sample_idx) in enumerate(neighbor_samples):
         # try:
         print(sample_filenames[original_idx])

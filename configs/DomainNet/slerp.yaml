@@ -4,11 +4,8 @@ EXP:
   PROJ: "DomainNetMini_LADS_Replication"
   SEED: 0
   TEXT_PROMPTS: [['a realistic photo of a {}'], ['a painting of a {}'], ['clipart of a {}']]
-  NEUTRAL_TEXT_PROMPTS: ['a sketch of a {}']
-  # TEXT_PROMPTS: [ 'a realistic photo of a {}.', 'a painting of a {}.', 'clipart of a {}.']
-  # NEUTRAL_TEXT_PROMPTS: ['a sketch of a {}', 'a pencil drawing of a {}.', 'a drawing of a {}.'] # you can also just use one prompt
-  # AUGMENTATION: 'LADS'
-  AUGMENTATION: Directional
+  NEUTRAL_TEXT_PROMPTS: ['a sketch of a {}', 'a pencil drawing of a {}.', 'a drawing of a {}.'] # you can also just use one prompt
+  AUGMENTATION: 'SLERP'
   EPOCHS: 400
   ENSAMBLE: False
   LOG_NN: True

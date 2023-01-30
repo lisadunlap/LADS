@@ -86,9 +86,6 @@ if args.DATA.LOAD_CACHED:
     assert os.path.exists(cache_file), f"{cache_file} does not exist. To compute embeddings, set DATA.LOAD_CACHED=False"
     print(f"Loading cached embeddings from {cache_file}")
     train_features, train_labels, train_groups, train_domains, train_filenames, val_features, val_labels, val_groups, val_domains, val_filenames, test_features, test_labels, test_groups, test_domains, test_filenames = load_embeddings(cache_file, args.DATA.DATASET)
-    print(np.unique(train_domains))
-    print(np.unique(val_domains))
-    print(np.unique(test_domains))
 else:
     cache_file = "data/CUB/vit14_new.pth"
     dataset_classes, dataset_domains = dh.DATASET_CLASSES[args.DATA.DATASET], dh.DATASET_DOMAINS[args.DATA.DATASET]

@@ -518,7 +518,7 @@ class DPLCLIP(nn.Module):
 #     def predict(self, img_embeddings, label=None):
 #         return self.prompt_learner.predict(img_embeddings.cuda())
 
-from CLIP.clip.simple_tokenizer import SimpleTokenizer as _Tokenizer
+from clip.simple_tokenizer import SimpleTokenizer as _Tokenizer
 from collections import OrderedDict
 
 _tokenizer = _Tokenizer()

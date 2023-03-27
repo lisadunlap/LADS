@@ -3,7 +3,16 @@ Official Implementation of [LADS (Latent Augmentation using Domain descriptionS)
 
 ![LADS method overview.](figs/lads-method-2-1.png "LADS method overview")
 
-*WARNING: this is still WIP, please raise an issue if you run into any bugs.*
+*WARNING: this is still WIP, please raise an issue or email me if you run into any bugs.*
+
+```
+@article{dunlap2023lads,
+  title={Using Language to Entend to Unseen Domains},
+  author = {Dunlap, Lisa and Mohri, Clara and Guillory, Devin and Zhang, Han and Darrell, Trevor and Gonzalez, Joseph E. and Raghunathan, Aditi and Rohrbach, Anja},
+  journal={International Conference on Learning Representations (ICLR)},
+  year={2023}
+}
+```
 
 ## TODOs
 [X] clean up emb saving/loading

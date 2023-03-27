@@ -60,7 +60,7 @@ class Base:
         # target_embeddings is size (num_domains, num_classes, emb_size)
         # source_embeddings is size (num_source_domain_descriptions, num_classes, emb_size)
         if len(source_embeddings) == 0 or len(target_embeddings) == 0:
-            self.text_embeddings = []
+            self.text_embeddings = torch.Tensor([])
         elif source_embeddings.shape[0] > 1:
             self.text_embeddings = target_embeddings - source_embeddings.mean(axis=0)
         else:
@@ -142,9 +142,9 @@ class ClipMLP(Base):
         """
         Set up data, model, loss, opt and run
         """
-        self.train_dataset = EmbeddingDataset(self.cfg, inputs, labels, groups, dom_gt, self.text_emb)
+        self.train_dataset = EmbeddingDataset(self.cfg, inputs, labels, groups, dom_gt)
         self.train_loader = torch.utils.data.DataLoader(self.train_dataset, batch_size=self.cfg.DATA.BATCH_SIZE, shuffle=True)
-        self.test_dataset = EmbeddingDataset(self.cfg, test_inputs, test_labels, test_groups, test_dom_gt, self.text_emb)
+        self.test_dataset = EmbeddingDataset(self.cfg, test_inputs, test_labels, test_groups, test_dom_gt)
         self.test_loader = torch.utils.data.DataLoader(self.test_dataset, batch_size=self.cfg.DATA.BATCH_SIZE, shuffle=False)
         best_acc, best_epoch = 0, 0
         self.create_model(inputs) # create model

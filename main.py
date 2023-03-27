@@ -85,17 +85,34 @@ else:
     model = model.to(device)
 
 # # load data
-if args.DATA.LOAD_CACHED:
-    cache_file = f"{args.DATA.SAVE_PATH}/{args.DATA.DATASET}/{args.EXP.IMAGE_FEATURES}_{args.EXP.CLIP_PRETRAINED_DATASET}_{args.EXP.CLIP_MODEL.replace('/','_')}.pt"
-    dataset_classes, dataset_domains = dh.DATASET_CLASSES[args.DATA.DATASET], dh.DATASET_DOMAINS[args.DATA.DATASET]
-    assert os.path.exists(cache_file), f"{cache_file} does not exist. To compute embeddings, set DATA.LOAD_CACHED=False"
-    print(f"Loading cached embeddings from {cache_file}")
-    train_features, train_labels, train_groups, train_domains, train_filenames, val_features, val_labels, val_groups, val_domains, val_filenames, test_features, test_labels, test_groups, test_domains, test_filenames = load_embeddings(cache_file, args.DATA.DATASET)
-# cache_file = f"{args.DATA.SAVE_PATH}/{args.DATA.DATASET}/{args.EXP.IMAGE_FEATURES}_{args.EXP.CLIP_PRETRAINED_DATASET}_{args.EXP.CLIP_MODEL.replace('/','_')}.pt"
-# dataset_classes, dataset_domains = dh.DATASET_CLASSES[args.DATA.DATASET], dh.DATASET_DOMAINS[args.DATA.DATASET]
-# if os.path.exists(cache_file):
+# if args.DATA.LOAD_CACHED:
+#     cache_file = f"{args.DATA.SAVE_PATH}/{args.DATA.DATASET}/{args.EXP.IMAGE_FEATURES}_{args.EXP.CLIP_PRETRAINED_DATASET}_{args.EXP.CLIP_MODEL.replace('/','_')}.pt"
+#     dataset_classes, dataset_domains = dh.DATASET_CLASSES[args.DATA.DATASET], dh.DATASET_DOMAINS[args.DATA.DATASET]
+#     assert os.path.exists(cache_file), f"{cache_file} does not exist. To compute embeddings, set DATA.LOAD_CACHED=False"
 #     print(f"Loading cached embeddings from {cache_file}")
 #     train_features, train_labels, train_groups, train_domains, train_filenames, val_features, val_labels, val_groups, val_domains, val_filenames, test_features, test_labels, test_groups, test_domains, test_filenames = load_embeddings(cache_file, args.DATA.DATASET)
+# load data
+# if args.DATA.LOAD_CACHED:
+#     print(args.DATA.LOAD_CACHED)
+#     if args.EXP.IMAGE_FEATURES == 'clip' or args.EXP.IMAGE_FEATURES == 'openclip':
+#         model_name = args.EXP.CLIP_MODEL
+#     else:
+#         model_name = args.EXP.IMAGE_FEATURES
+#     cache_file, dataset_classes, dataset_domains = dh.get_cache_file(DATASET_NAME, model_name, args.EXP.IMAGE_FEATURES)
+#     assert os.path.exists(cache_file), f"{cache_file} does not exist. To compute embeddings, set DATA.LOAD_CACHED=False"
+#     data = torch.load(cache_file)
+#     train_features, train_labels, train_groups, train_domains, train_filenames = data['train_features'], data['train_labels'], data['train_groups'], data['train_domains'], data['train_filenames']
+#     val_features, val_labels, val_groups, val_domains, val_filenames = data['val_features'], data['val_labels'], data['val_groups'], data['val_domains'], data['val_filenames']
+#     test_features, test_labels, test_groups, test_domains, test_filenames = data['test_features'], data['test_labels'], data['test_groups'], data['test_domains'], data['test_filenames']
+#     # move some val data to test 
+#     if args.DATA.DATASET != 'ColoredMNISTBinary':
+#         val_features, val_labels, val_groups, val_domains, val_filenames = data['val_features'][::2], data['val_labels'][::2], data['val_groups'][::2], data['val_domains'][::2], data['val_filenames'][::2]
+#         test_features, test_labels, test_groups, test_domains, test_filenames = np.concatenate((data['test_features'], data['val_features'][1::2])), np.concatenate((data['test_labels'], data['val_labels'][1::2])), np.concatenate((data['test_groups'], data['val_groups'][1::2])), np.concatenate((data['test_domains'], data['val_domains'][1::2])), np.concatenate((data['test_filenames'], data['val_filenames'][1::2]))
+cache_file = f"{args.DATA.SAVE_PATH}/{args.DATA.DATASET}/{args.EXP.IMAGE_FEATURES}_{args.EXP.CLIP_PRETRAINED_DATASET}_{args.EXP.CLIP_MODEL.replace('/','_')}.pt"
+dataset_classes, dataset_domains = dh.DATASET_CLASSES[args.DATA.DATASET], dh.DATASET_DOMAINS[args.DATA.DATASET]
+if os.path.exists(cache_file):
+    print(f"Loading cached embeddings from {cache_file}")
+    train_features, train_labels, train_groups, train_domains, train_filenames, val_features, val_labels, val_groups, val_domains, val_filenames, test_features, test_labels, test_groups, test_domains, test_filenames = load_embeddings(cache_file, args.DATA.DATASET)
 else:
     # print(f"Computing embeddings and saving to {cache_file}")
     trainset, valset, testset = dh.get_dataset(DATASET_NAME, preprocess)
@@ -151,6 +168,7 @@ if args.EXP.ENSAMBLE:
     print("Zeroshot weights set!")
 
 # if we want to do any augmentations, do them here
+print("old dataset sizes", len(train_features), len(val_features), len(test_features))
 num_augmentations = 1
 if args.EXP.AUGMENTATION != None and args.EXP.AUGMENTATION != 'None':
     print("Augmenting training set...")
@@ -160,12 +178,18 @@ if args.EXP.AUGMENTATION != None and args.EXP.AUGMENTATION != 'None':
         augment = getattr(methods.augmentations, args.EXP.AUGMENTATION)(args, train_features, train_labels, train_groups, train_domains, train_filenames, bias_correction.text_embeddings)
     train_features, train_labels, train_domains, train_groups, train_filenames = augment.augment_dataset()
     print("Training set augmented!")
+    print("new dataset sizes", len(train_features), len(val_features), len(test_features))
 
 if args.EXP.LOG_NN:
         features, labels, groups, domains, filenames = np.concatenate([old_val_features, old_test_features]), np.concatenate([old_val_labels, old_test_labels]), np.concatenate([old_val_groups, old_test_groups]), np.concatenate([old_val_domains, old_test_domains]), np.concatenate([old_val_filenames, old_test_filenames])
         if len(np.unique(train_domains)) > 1:
             filtered_idxs = np.where(train_domains != train_domains[0])
-            sample_features, sample_domains, sample_labels, sample_filenames = np.array(train_features[filtered_idxs]), train_domains[filtered_idxs], train_labels[filtered_idxs], train_filenames[filtered_idxs]
+            print(train_features.shape)
+            print( train_features[filtered_idxs])
+            print(train_domains[filtered_idxs])
+            print(train_labels[filtered_idxs])
+            print(train_filenames[filtered_idxs])
+            sample_features, sample_domains, sample_labels, sample_filenames = train_features[filtered_idxs], train_domains[filtered_idxs], train_labels[filtered_idxs], train_filenames[filtered_idxs]
             sample_idxs = random.sample(list(range(len(sample_filenames))), min((len(train_filenames), 1000)))
             sample_features, sample_domains, sample_labels, sample_filenames = sample_features[sample_idxs], sample_domains[sample_idxs], sample_labels[sample_idxs], sample_filenames[sample_idxs]
         else:
@@ -185,7 +209,7 @@ if args.EXP.LOG_NN:
             except:
                 print(f"sample idx {sample_idx} is not a valid index")
         wandb.log({"train features NN": wandb.Image(f), "domain consistency acc": domain_acc, "class consistency acc": class_acc, "unique nn": prop_unique})
-        # wandb.sklearn.plot_confusion_matrix(sample_domains, neighbor_domains, dataset_domains)
+        wandb.sklearn.plot_confusion_matrix(sample_domains, neighbor_domains, dataset_domains)
         print("Plotted Nearest Neighbors")
 
 # train MLP with domain adaptation loss

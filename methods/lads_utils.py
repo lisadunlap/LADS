@@ -36,8 +36,8 @@ def get_domain_text_embs(model, cfg, source_text_prompts, target_text_prompts, c
     templates to put the class name in. 
     """
     print("len of prompts ", target_text_prompts, len(target_text_prompts), source_text_prompts, len(source_text_prompts))
-    if len(target_text_prompts) == 0 or len(source_text_prompts) == 0:
-        return [], []
+    # if len(target_text_prompts) == 0 or len(source_text_prompts) == 0:
+    #     return [], []
     if cfg.AUGMENTATION.GENERIC:
         text_embeddings = zeroshot_classifier(target_text_prompts, model, normalize=cfg.METHOD.NORMALIZE, model_type=cfg.EXP.IMAGE_FEATURES)
         text_embeddings = np.transpose(text_embeddings, (1,0))
@@ -70,8 +70,8 @@ def get_domain_text_embs(model, cfg, source_text_prompts, target_text_prompts, c
             source_embeddings = text_pairs[:len(source_text_prompts)]
             target_embeddings = text_pairs[len(source_text_prompts):]
         else:
+            print("no source text prompts, using target text prompts for source embeddings")
             source_embeddings = torch.zeros_like(target_embeddings)
-        print("target embeddings", target_embeddings.shape)
     return source_embeddings, target_embeddings
 
 
@@ -92,11 +92,13 @@ class EmbeddingDataset:
         else:
             print("==> Using domain CLIP labels")
             self.domain_labels = self.get_labels(self.text_emb, self.inputs) if len(self.text_emb) > 0 else np.array([0 for i in range(len(self.inputs))])
+            print("domain labels", np.unique(np.array(self.domain_labels)))
         self.num_classes, self.num_domains = len(set(self.labels)), len(set(self.domain_labels))
         # get class weights for upweighting
         self.class_weights = self.get_counts(self.labels)
         self.dom_weights = self.get_counts(self.domain_labels)
-        assert len(self.inputs) == len(self.labels) == len(self.domain_labels), "input, label, and domain label lengths don't match"
+        print(len(self.inputs), len(self.labels), len(self.domain_labels))
+        assert len(self.inputs) == len(self.labels) == len(self.domain_labels), f"input, label, and domain label lengths don't match"
 
     @staticmethod
     def get_counts(labels):

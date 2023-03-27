@@ -80,19 +80,19 @@ class MPLZS(MLP):
         self.fc.bias.requires_grad = True
 
 class ResMLP(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, input_dim=768, hidden_dim=384, num_layers=1):
         super(ResMLP, self).__init__()
-        self.num_layers = cfg["num_layers"]
+        self.num_layers = num_layers
         assert self.num_layers in [1,2,3], 'Only one or two # layers supported'
         if self.num_layers == 1:
-            self.fc = nn.Linear(cfg["in_dim"], cfg["out_dim"])
+            self.fc = nn.Linear(input_dim, input_dim)
         elif self.num_layers == 2:
-            self.fc1 = nn.Linear(cfg["in_dim"], cfg["h_dim"])
-            self.fc2 = nn.Linear(cfg["h_dim"], cfg["out_dim"])
+            self.fc1 = nn.Linear(input_dim, hidden_dim)
+            self.fc2 = nn.Linear(hidden_dim, input_dim)
         else:
-            self.fc1 = nn.Linear(cfg["in_dim"], cfg["h_dim"])
-            self.fc2 = nn.Linear(cfg["h_dim"], cfg["h_dim"])
-            self.fc3 = nn.Linear(cfg["h_dim"], cfg["out_dim"])
+            self.fc1 = nn.Linear(input_dim, hidden_dim)
+            self.fc2 = nn.Linear(hidden_dim, input_dim)
+            self.fc3 = nn.Linear(hidden_dim, input_dim)
 
     def forward(self, x):
         if self.num_layers == 1:

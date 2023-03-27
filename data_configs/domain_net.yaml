@@ -1,0 +1,3 @@
+DATA:
+  SOURCE_DOMAIN: clipart # options are clipart, infograph, painting, quickdraw, real, sketch
+  TARGET_DOMAIN: real # options are clipart, infograph, painting, quickdraw, real, sketch

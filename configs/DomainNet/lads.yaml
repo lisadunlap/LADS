@@ -8,7 +8,7 @@ EXP:
   # TEXT_PROMPTS: [ 'a realistic photo of a {}.', 'a painting of a {}.', 'clipart of a {}.']
   # NEUTRAL_TEXT_PROMPTS: ['a sketch of a {}', 'a pencil drawing of a {}.', 'a drawing of a {}.'] # you can also just use one prompt
   # AUGMENTATION: 'LADS'
-  AUGMENTATION: Directional
+  AUGMENTATION: LADS
   EPOCHS: 400
   ENSAMBLE: False
   LOG_NN: True
@@ -37,4 +37,5 @@ AUGMENTATION:
   EPOCHS: 50
   GENERIC: False
   ALPHA: 0.5
-  DOM_LABELS: ['real', 'painting', 'clipart']
+  # DOM_LABELS: ['real', 'painting', 'clipart']
+  DOM_LABELS: ['clipart', 'painting', 'real', 'sketch']

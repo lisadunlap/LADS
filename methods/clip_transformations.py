@@ -186,8 +186,6 @@ class ClipMLP(Base):
                 if self.cfg.EXP.CHECKPOINT_VAL:
                     self.train_val_loop(self.test_loader, epoch, phase="val")
             self.save_checkpoint(0.0, epoch, last=True)
-            # wandb.ss['best val balanced acc'] = self.best_acc
-            # wandb.ss['best epoch'] = self.best_epoch
 
     def load_checkpoint(self, path):
         checkpoint = torch.load(path)

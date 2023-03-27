@@ -26,6 +26,8 @@ def get_config(name="Waterbirds"):
         cfg       = OmegaConf.load('data_configs/waterbirds.yaml')
     elif "ColoredMNIST" in name:
         cfg       = OmegaConf.load('data_configs/colored_mnist.yaml')
+    elif "DomainNet" in name:
+        cfg       = OmegaConf.load('data_configs/domain_net.yaml')
     else:
         raise ValueError(f"{name} Dataset config not found")
     args      = OmegaConf.merge(base_cfg, cfg)

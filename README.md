@@ -21,17 +21,17 @@ Official Implementation of [LADS (Latent Augmentation using Domain descriptionS)
 ## Code Structure 
 The configurations for each method are in the `configs` folder. To try say the baseline of doing normal LR on the CLIP embeddings:
 ```
-python main.py --config configs/Waterbirds/base.yaml
+python main.py --config configs/Waterbirds/mlp.yaml
 ```
 
 Datasets supported are in the [helpers folder](./helpers/data_helpers.py). Currently they are:
 * Waterbirds (100% and 95%)
 * ColoredMNIST (LNTL version and simplified version)
-* DomainNet
+* DomainNet (the version used in the paper is `DATA.DATASET=DomainNetMini`)
 * CUB Paintings
 * OfficeHome
 
-You can download the CLIP embeddings of these datasets [here](https://drive.google.com/drive/folders/1ItjhX7RPfQ6fQQk6_bEYJPewnkVdcfOC?usp=sharing)
+You can download the CLIP embeddings of these datasets [here](https://drive.google.com/drive/folders/1ItjhX7RPfQ6fQQk6_bEYJPewnkVdcfOC?usp=sharing). We also have the embeddings for CUB, Waterbirds, and DomainNetMini in the [embeddings](./embeddings/) folder.
 
 Since computing the CLIP embeddings for each train/val/test set is time consuming, you can store the embeddings by setting `DATA.LOAD_CACHED=False` and `DATA.SAVE_PATH=[path you want to save to]`
 

@@ -30,6 +30,7 @@ DATASET_PATHS = {
         "ViT-L/14": {
                 "CUB": "data/cub/vit14_clip.pth",
                 "DomainNetMini": "data/domainnet/vit14_clip.pth",
+                "DomainNetMini": "embeddings/DomainNetMini/clip_openai_ViT-L_14.pt",
                 "MNIST_SVHN": "data/SVHN/vit14_clip.pth",
                 "Waterbirds": "data/waterbirds/vit14_clip.pth",
                 "ColoredMNISTBinary": "data/ColoredMNIST/binary_vit14.pth",

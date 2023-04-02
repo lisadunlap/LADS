@@ -306,8 +306,8 @@ class Directional(Augment):
                 for i in range(len(self.orig_prompts)):
                     self.train_network("sketch", self.orig_prompts[:,i], i)
             else:
-                for i in range(len(self.text_features[0])):
-                    self.train_network("sketch", self.text_features[:,i], i)
+                for i in range(len(self.text_features)):
+                    self.train_network("sketch", self.text_features[i], i)
         else:
             for i in range(len(self.text_features)):
                 self.train_network("sketch", self.text_features[i], i)
@@ -321,12 +321,13 @@ class Directional(Augment):
         image embeddings is similar to the difference in text embeddings of the 
         source and target domain.
         """
+        print("text feat ", self.text_features.shape)
         if not self.cfg.AUGMENTATION.GENERIC:
-            delta_t = torch.Tensor(self.text_features[:,num_net])
+            delta_t = torch.Tensor(self.text_features[num_net])
         else:
             delta_t = torch.Tensor(self.text_features[num_net])
         delta_t = delta_t.type(torch.float).cuda()
-        
+        print("text features shape ", self.text_features.shape, delta_t.shape)
         def custom_loss(predictions, labels, targets):
             total_sum = None
             delta_i = predictions - labels

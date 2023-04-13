@@ -15,7 +15,7 @@ import os
 
 CUB_DOMAINS = ["photo", "painting"]
 
-with open('/shared/lisabdunlap/data/CUB-200-Painting/classes.txt') as f:
+with open('./data/cub_classes.txt') as f:
     lines = f.readlines()
     
 CUB_CLASSES = [l.replace('\n', '').split('.')[-1].replace('_', ' ') for l in lines]
@@ -25,6 +25,7 @@ class Cub2011(torch.utils.data.Dataset):
 
     def __init__(self, root, train=True, transform=None, download=False):
         self.root = os.path.expanduser(root)
+        print("root", root)
         self.transform = transform
         self.train = train
 

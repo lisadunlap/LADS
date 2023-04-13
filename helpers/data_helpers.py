@@ -141,9 +141,9 @@ def get_dataset(dataset_name, transform, val_transform=None, biased_val=True):
         valset = MultiDomain('/shared/lisabdunlap/data', domains=['sketch', 'clipart', 'painting', 'real'], split='val', transform=val_transform)
         testset = MultiDomain('/shared/lisabdunlap/data', domains=['sketch', 'clipart', 'painting', 'real'], split='test', transform=val_transform)
     elif dataset_name == "CUB":
-        trainset = Cub2011('/shared/lisabdunlap/data', train=True, transform=transform)
-        valset = Cub2011('/shared/lisabdunlap/data', train=False, transform=val_transform)
-        testset = Cub2011Painting('/shared/lisabdunlap/data/CUB-200-Painting', transform=val_transform)
+        trainset = Cub2011('/work/datasets', train=True, transform=transform)
+        valset = Cub2011('/work/datasets', train=False, transform=val_transform)
+        testset = Cub2011Painting('/work/datasets/CUB-200-Painting', transform=val_transform)
     elif dataset_name == "GroZi":
         trainset = Products(split='train', transform=transform)
         valset = Products(split='val', transform=val_transform)

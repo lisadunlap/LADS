@@ -25,11 +25,11 @@ python main.py --config configs/Waterbirds/mlp.yaml
 ```
 
 Datasets supported are in the [helpers folder](./helpers/data_helpers.py). Currently they are:
-* Waterbirds (100% and 95%)
-* ColoredMNIST (LNTL version and simplified version)
-* DomainNet (the version used in the paper is `DATA.DATASET=DomainNetMini`)
-* CUB Paintings
-* OfficeHome
+* Waterbirds (100% and 95%) [our specific split](https://drive.google.com/file/d/1zJpQYGEt1SuwitlNfE06TFyLaWX-st1k/view) [code to generate data](https://github.com/kohpangwei/group_DRO)
+* ColoredMNIST (LNTL version and simplified version) NOTEBOOK COMING SOON
+* DomainNet (the version used in the paper is `DATA.DATASET=DomainNetMini`) [full dataset](http://ai.bu.edu/DomainNet/)
+* CUB Paintings [photos dataset](https://www.vision.caltech.edu/datasets/cub_200_2011/) [paintings dataset](https://github.com/thuml/PAN)
+* OfficeHome COMING SOON
 
 You can download the CLIP embeddings of these datasets [here](https://drive.google.com/drive/folders/1ItjhX7RPfQ6fQQk6_bEYJPewnkVdcfOC?usp=sharing). We also have the embeddings for CUB, Waterbirds, and DomainNetMini in the [embeddings](./embeddings/) folder.
 

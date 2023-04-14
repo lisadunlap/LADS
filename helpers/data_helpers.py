@@ -18,8 +18,6 @@ from datasets.cub import Cub2011Painting, Cub2011, CUB_DOMAINS, CUB_CLASSES
 from datasets.office_home import OfficeHome, OFFICE_HOME_CLASSES, OFFICE_HOME_DOMAINS
 from datasets.grozi import Products, GROZI_CLASSES, GROZI_DOMAINS
 
-from helpers.data_paths import DATASET_PATHS
-
 def get_config(name="Waterbirds"):
     base_cfg  = OmegaConf.load('data_configs/base.yaml')
     if name == "Waterbirds":
@@ -79,22 +77,6 @@ def get_dataset(dataset_name, transform, val_transform=None, biased_val=True):
         trainset = WaterbirdsOrig('/shared/lisabdunlap/vl-attention/data', args, transform=transform, biased_val=biased_val)
         valset = WaterbirdsOrig('/shared/lisabdunlap/vl-attention/data', args, split='val', transform=val_transform, biased_val=biased_val)
         testset = WaterbirdsOrig('/shared/lisabdunlap/vl-attention/data', args, split='test', transform=val_transform, biased_val=biased_val)
-    elif dataset_name == 'WaterbirdsTiny':
-        args = get_config('WaterbirdsTiny')
-        trainset = WaterbirdsOrig('/shared/lisabdunlap/vl-attention/data', args, transform=transform)
-        valset = WaterbirdsOrig('/shared/lisabdunlap/vl-attention/data', args, split='val', transform=val_transform)
-        testset = WaterbirdsOrig('/shared/lisabdunlap/vl-attention/data', args, split='test', transform=val_transform)
-    elif dataset_name == 'WaterbirdsSimple':
-        args = get_config('Waterbirds')
-        trainset = WaterbirdsSimple('/shared/lisabdunlap/vl-attention/data', args, transform=transform)
-        testset = WaterbirdsSimple('/shared/lisabdunlap/vl-attention/data', args, split='val', transform=val_transform)
-        valset = testset
-    elif dataset_name == 'ColoredMNIST':
-        args = get_config('ColoredMNIST')
-        args.DATA.CONFOUNDING = 1.0
-        trainset = ColoredMNIST('./data/ColoredMNIST', args, transform=transform, biased_val=biased_val)
-        valset = ColoredMNIST('./data/ColoredMNIST', args, split='val', transform=val_transform, biased_val=biased_val)
-        testset = ColoredMNIST('./data/ColoredMNIST', args, split='test', transform=val_transform, biased_val=biased_val)
     elif dataset_name == 'ColoredMNISTBinary':
         args = get_config('ColoredMNIST')
         args.DATA.CONFOUNDING = 1.0
@@ -142,10 +124,6 @@ def get_dataset(dataset_name, transform, val_transform=None, biased_val=True):
         trainset = Cub2011('/shared/lisabdunlap/data', train=True, transform=transform)
         valset = Cub2011('/shared/lisabdunlap/data', train=False, transform=val_transform)
         testset = Cub2011Painting('/shared/lisabdunlap/data/CUB-200-Painting', transform=val_transform)
-    elif dataset_name == "GroZi":
-        trainset = Products(split='train', transform=transform)
-        valset = Products(split='val', transform=val_transform)
-        testset = Products(split='test', transform=val_transform)
     elif dataset_name == "OfficeHomeProduct":
         trainset = OfficeHome('/shared/lisabdunlap/data', domains=["Product"], train=True, transform=transform)
         valset = OfficeHome('/shared/lisabdunlap/data', domains=["Product"], train=False, transform=transform)
@@ -166,10 +144,7 @@ def get_dataset(dataset_name, transform, val_transform=None, biased_val=True):
 DATASET_CLASSES = {
     "Waterbirds": ['landbird', 'waterbird'],
     "Waterbirds95": ['landbird', 'waterbird'],
-    "Planes": ['airbus', 'boeing'],
-    "ColoredMNIST": ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
     "ColoredMNISTBinary": ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
-    "ColoredMNISTQuinque": ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
     "MNIST": ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
     "SVHN": ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
     "MNIST_SVHN": ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
@@ -181,15 +156,12 @@ DATASET_CLASSES = {
     "OfficeHomeProduct": OFFICE_HOME_CLASSES,
     "OfficeHomeClipart": OFFICE_HOME_CLASSES,
     "OfficeHomeArt": OFFICE_HOME_CLASSES,
-    "GroZi": GROZI_CLASSES,
 }
 
 DATASET_DOMAINS = {
     "Waterbirds": ['forest', 'water'],
     "Waterbirds95": ['forest', 'water'],
     "ColoredMNISTBinary": ['red', 'blue'],
-    "ColoredMNISTQuinque": ['red','green','yellow','pink','blue'],
-    "DomainNet": ['photo', 'sketch'],
     "DomainNetMini": MINI_DOMAINS,
     "DomainNetMiniAug": MINI_DOMAINS,
     "DomainNetMiniOracle": MINI_DOMAINS,
@@ -199,7 +171,6 @@ DATASET_DOMAINS = {
     "OfficeHomeProduct": OFFICE_HOME_DOMAINS,
     "OfficeHomeClipart": OFFICE_HOME_DOMAINS,
     "OfficeHomeArt": OFFICE_HOME_DOMAINS,
-    "GroZi": GROZI_DOMAINS,
 }
 
 def get_domain(dataset_name):
@@ -207,7 +178,3 @@ def get_domain(dataset_name):
 
 def get_class(dataset_name):
     return DATASET_CLASSES[dataset_name]
-
-def get_cache_file(dataset_name, model_name='ViT-B/32', model_type='clip'):
-    assert dataset_name in DATASET_PATHS[model_type][model_name].keys(), f"{dataset_name} is not cached or not added to the DATASET_PATHS dict in helpers/dataset_helpers.py"
-    return DATASET_PATHS[model_type][model_name][dataset_name], DATASET_CLASSES[dataset_name], DATASET_DOMAINS[dataset_name]

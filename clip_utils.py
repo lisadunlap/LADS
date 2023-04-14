@@ -26,34 +26,6 @@ import helpers
 
 import omegaconf
 
-# def get_features(dataset, model, device, model_type):
-#     if model_type != 'clip' and model_type != 'openclip':
-#         return get_resnet_features(dataset, model, device)
-#     model.eval()
-#     all_features = []
-#     all_labels = []
-#     all_groups, all_domains = [], []
-#     all_filenames = []
-    
-#     with torch.no_grad():
-#         for batch in tqdm(dataset):
-#             images, labels, groups, domains, filenames = batch['image'], batch['label'], batch['group'], batch['domain'], batch['filename']
-#             features = model.encode_image(images.to(device))
-
-#             all_features.append(features)
-#             all_labels.append(labels)
-#             all_groups.append(groups)
-#             all_domains.append(domains)
-#             all_filenames.extend(filenames)
-
-#     features = torch.cat(all_features).cpu().numpy()
-#     labels = torch.cat(all_labels).cpu().numpy()
-#     groups = torch.cat(all_groups).cpu().numpy()
-#     domains = torch.cat(all_domains).cpu().numpy()
-#     filenames = np.array(all_filenames)
-
-#     return features, labels, groups, domains, filenames
-
 def get_features(dataset, model, device, model_type):
     if model_type != 'clip':
         return get_resnet_features(dataset, model, device)
@@ -111,14 +83,9 @@ def load_embeddings(cache_file, dataset):
     Loads the embeddings from a file
     """
     save_dict = torch.load(cache_file)
-    print(save_dict.keys())
     train_features, train_labels, train_groups, train_domains, train_filenames = save_dict['train_features'], save_dict['train_labels'], save_dict['train_groups'], save_dict['train_domains'], save_dict['train_filenames']
     val_features, val_labels, val_groups, val_domains, val_filenames = save_dict['val_features'], save_dict['val_labels'], save_dict['val_groups'], save_dict['val_domains'], save_dict['val_filenames']
     test_features, test_labels, test_groups, test_domains, test_filenames = save_dict['test_features'], save_dict['test_labels'], save_dict['test_groups'], save_dict['test_domains'], save_dict['test_filenames']
-    # if dataset != 'ColoredMNISTBinary':
-    #     old_val_features, old_val_labels, old_val_groups, old_val_domains, old_val_filenames = val_features, val_labels, val_groups, val_domains, val_filenames
-    #     val_features, val_labels, val_groups, val_domains, val_filenames = val_features[::2], val_labels[::2], val_groups[::2], val_domains[::2], val_filenames[::2]
-    #     test_features, test_labels, test_groups, test_domains, test_filenames = np.concatenate((test_features, old_val_features[1::2])), np.concatenate((test_labels, old_val_labels[1::2])), np.concatenate((test_groups, old_val_groups[1::2])), np.concatenate((test_domains, old_val_domains[1::2])), np.concatenate((test_filenames, old_val_filenames[1::2]))
     return train_features, train_labels, train_groups, train_domains, train_filenames, val_features, val_labels, val_groups, val_domains, val_filenames, test_features, test_labels, test_groups, test_domains, test_filenames
 
 def projection(u, v):

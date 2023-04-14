@@ -111,7 +111,6 @@ else:
     }
     if not os.path.exists(f"{args.DATA.SAVE_PATH}/{args.DATA.DATASET}"):
         os.makedirs(f"{args.DATA.SAVE_PATH}/{args.DATA.DATASET}")
-    cache_file = f"{args.DATA.SAVE_PATH}/{args.DATA.DATASET}/{args.EXP.IMAGE_FEATURES}_{args.EXP.CLIP_PRETRAINED_DATASET}_{args.EXP.CLIP_MODEL.replace('/','_')}.pt"
     torch.save(save_dict, cache_file)
     print(f"Saved CLIP embeddings to {cache_file}")
 

@@ -23,6 +23,7 @@ DATA:
   UPWEIGHT_DOMAINS: False
   UPWEIGHT_CLASSES: True
   MODEL_DIM: 1024
+  ROOT: /shared/lisabdunlap/data
 
 METHOD:
   MODEL:

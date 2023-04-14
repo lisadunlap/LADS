@@ -63,18 +63,6 @@ class Base:
             self.text_embeddings = target_embeddings - source_embeddings.mean(axis=0)
         else:
             self.text_embeddings = target_embeddings - source_embeddings
-
-    # @staticmethod
-    # def compose_text_with_templates(text: str, templates=imagenet_templates) -> list:
-    #     return [template.format(text) for template in templates]
-
-    # @staticmethod
-    # def get_embedding(text_prompts, model):
-    #     text_inputs = torch.cat([clip.tokenize(t) for t in text_prompts]).cuda()
-    #     # Calculate features
-    #     with torch.no_grad():
-    #         text_features = model.encode_text(text_inputs)
-    #     return text_features.cpu().numpy()
     
     @staticmethod
     def normalize(inputs):
@@ -88,6 +76,36 @@ class Base:
         if self.cfg.METHOD.NORMALIZE:
             return self.normalize(inputs)
         return inputs
+
+
+class CLIPZS(Base):
+    """
+    CLIPZS method. Computes CLIP embeddings and then applies a zero-shot classifier.
+    """
+    def __init__(self, text_prompts, model, cfg, neutral_prompts=[]):
+        super().__init__(text_prompts, model, cfg, neutral_prompts)
+        templates = getattr(helpers.text_templates, cfg.EXP.TEMPLATES)
+        text_embs = zeroshot_classifier([[p.format(c) for p in templates] for c in self.class_names], model, model_type=self.cfg.EXP.IMAGE_FEATURES, cuda_device='1')
+        self.class_text_embs = text_embs.float().cuda()
+        print("class text embs", self.class_text_embs.shape)
+
+    def train_debias(self, inputs, labels, groups, dom_gt, test_inputs, test_labels, test_groups, test_dom_gt):
+        pass
+
+    def eval(self, inputs):
+        with torch.no_grad():
+            preds, probs = np.array([]), []
+            generator = chunks(torch.tensor(inputs).cuda().float(), self.cfg.DATA.BATCH_SIZE)
+            for i, images in enumerate(generator):
+                images = images.cuda()
+                images /= images.norm(dim=-1, keepdim=True)
+                # predict
+                logits = (100. * images @ self.class_text_embs).float().softmax(dim=-1)
+                clip_pred = torch.argmax(logits, dim=-1)
+                preds = np.append(preds, clip_pred.cpu().numpy())
+                probs.append(logits.detach().cpu().numpy())
+        return preds, np.concatenate(probs, axis=0)
+
 
 class EmbeddingDataset:
     """

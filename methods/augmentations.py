@@ -25,9 +25,9 @@ except:
     progress_bar = lambda current, total, msg: None
 
 import helpers.data_helpers as dh
-from methods.lads_utils import EmbeddingDataset, get_domain_text_embs, DirectionLoss
+from methods.clip_transformations import EmbeddingDataset
 from clip_utils import *
-from methods import predictors
+from methods.lads_utils import get_domain_text_embs, DirectionLoss
 
 import omegaconf
 from omegaconf import OmegaConf
@@ -52,20 +52,20 @@ class Augment:
         self.alpha = self.cfg.AUGMENTATION.ALPHA
         self.include_orig = self.cfg.AUGMENTATION.INCLUDE_ORIG_TRAINING
         self.prompts = list(self.cfg.EXP.TEXT_PROMPTS)
-        if type(self.prompts[0]) == omegaconf.listconfig.ListConfig:
-            self.prompts = [p[0] for p in self.prompts]
         self.neutral_prompts = list(self.cfg.EXP.NEUTRAL_TEXT_PROMPTS)
         for prompt in list(self.cfg.EXP.TEXT_PROMPTS):
             print("DOM LABELS ", self.cfg.AUGMENTATION.DOM_LABELS, len(list(self.cfg.AUGMENTATION.DOM_LABELS)))
             if len(list(self.cfg.AUGMENTATION.DOM_LABELS)) == 0:
                 if type(prompt) == omegaconf.listconfig.ListConfig:
+                    print("remove list")
                     prompt = prompt[0]
+                print(type(prompt), prompt, self.domain_names)
                 dom_idx = [i for i in range(len(self.domain_names)) if self.domain_names[i] in prompt]
                 assert len(dom_idx) == 1, "error indexing domains, make sure your text prompt contains the name of the domain"
                 self.domain_indexes.append(dom_idx[0])
             else:
                 self.domain_indexes = [self.domain_names.index(p) for p in list(self.cfg.AUGMENTATION.DOM_LABELS)]
-        # print("domain indexes ", self.domain_indexes)
+        print("domain indexes ", self.domain_indexes)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if self.cfg.EXP.IMAGE_FEATURES == 'clip':
             model, preprocess = clip.load(self.cfg.EXP.CLIP_MODEL, device)
@@ -124,13 +124,13 @@ class Addition(Augment):
     def __init__(self, cfg, image_features, labels, group_labels, domain_labels, filenames, text_features):
         super().__init__(cfg, image_features, labels, group_labels, domain_labels, filenames, text_features)
         self.class_names = dh.DATASET_CLASSES[cfg.DATA.DATASET]
-        print("neutral promts ", self.neutral_prompts)
-        self.neutral_embedding, self.orig_text_embs = get_domain_text_embs(self.model, self.cfg, self.neutral_prompts, self.prompts, self.class_names)
-        print("neutral prompts ", self.neutral_prompts, self.neutral_embedding.shape)
-        print("prompts ", self.prompts, self.orig_text_embs.shape)
+        self.orig_text_embs = self.get_orig_text_embeddings(self.prompts)
+        print("neutral prompts ", self.neutral_prompts)
+        print("prompts ", self.prompts)
+        self.neutral_embedding = self.get_orig_text_embeddings(self.neutral_prompts)
         # self.neutral_embedding = zeroshot_classifier([self.neutral_prompts], self.model, model_type=self.cfg.EXP.IMAGE_FEATURES)
         # self.neutral_embedding /= np.linalg.norm(self.neutral_embedding, axis=-1, keepdims=True)
-        # print("neutral embedding size ", self.neutral_embedding.shape, self.orig_text_embs.shape)
+        print("neutral embedding size ", self.neutral_embedding.shape, self.orig_text_embs.shape)
 
     def get_interp(self, img_embedding, text_features, orig_text_embeddings):
         if self.alpha == 'cosine':
@@ -212,7 +212,10 @@ class Average(Augment):
         return list(aug_embedding)
 
 class SLERP(Addition):
-
+    """
+    Spherical Linear Interpolation (might be buggy). This was the original idea but didn't work as well as a learned method.
+    It's possible this could work better with a much better model
+    """
     def __init__(self, cfg, image_features, labels, group_labels, domain_labels, filenames, text_features):
         super().__init__(cfg, image_features, labels, group_labels, domain_labels, filenames, text_features)
         # assumes text features is a list 
@@ -222,23 +225,50 @@ class SLERP(Addition):
         Augments a single by taking the shperical interpolation of the image emb and text emn
         """
         return [self.slerp(img_embedding, feat, self.alpha) for feat in text_features]
+
+    # def get_text_embeddings(self, model_name, prompts, norm=True):
+    #     text_embs = zeroshot_classifier(prompts, self.model, model_type=self.cfg.EXP.IMAGE_FEATURES).cpu().numpy().T
+    #     if norm:
+    #         text_embs /= np.linalg.norm(text_embs, axis=-1, keepdims=True)
+    #     return text_embs
         
     @staticmethod
     def slerp(p0, p1, t):
         omega = np.arccos(np.dot(p0/np.linalg.norm(p0), p1/np.linalg.norm(p1)))
         so = np.sin(omega)
         return np.sin((1.0-t)*omega) / so * p0 + np.sin(t*omega)/so * p1
+ 
 
-class ResMLP(nn.Module):
+class MLP(nn.Module):
     def __init__(self, input_dim=768, hidden_dim=384):
-        super(ResMLP, self).__init__()
+        super(MLP, self).__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, input_dim)
 
-    def forward(self, x):
-        h = nnf.relu(self.fc1(x))
-        h = self.fc2(h)
-        return x + h
+    def forward(self, x): 
+        # print(x.dtype)
+        x = nnf.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
+
+# class DirectionLoss(torch.nn.Module):
+
+#     def __init__(self, loss_type='mse'):
+#         super(DirectionLoss, self).__init__()
+
+#         self.loss_type = loss_type
+
+#         self.loss_func = {
+#             'mse':    torch.nn.MSELoss,
+#             'cosine': torch.nn.CosineSimilarity,
+#             'mae':    torch.nn.L1Loss
+#         }[loss_type]()
+
+#     def forward(self, x, y):
+#         if self.loss_type == "cosine":
+#             return 1. - self.loss_func(x, y)
+        
+#         return self.loss_func(x, y)
 
 class LADS(Augment):
     """
@@ -247,19 +277,14 @@ class LADS(Augment):
     is taken from the StyleGAN-NADA paper(https://stylegan-nada.github.io). 
     """
 
-    def __init__(self, cfg, image_features, labels, group_labels, domain_labels, filenames, text_features, val_image_features, val_labels, val_group_labels,val_domain_labels, class_weights=None):
+    def __init__(self, cfg, image_features, labels, group_labels, domain_labels, filenames, text_features, val_image_features, val_labels, val_group_labels, val_domain_labels):
         super().__init__(cfg, image_features, labels, group_labels, domain_labels, filenames, text_features)
-        print(f"neutral prompts source = {self.neutral_prompts} target = {self.prompts})")
         source_embeddings, target_embeddings = get_domain_text_embs(self.model, cfg, self.neutral_prompts, self.prompts, self.class_names)
-        print("DONE GETTING EMBEDDINGS")
         # target_embeddings is size (num_domains, num_classes, emb_size)
         # source_embeddings is size (num_source_domain_descriptions, num_classes, emb_size)
-        if len(source_embeddings) > 0:
-            source_embeddings /= source_embeddings.norm(dim=-1, keepdim=True)
-        else:
-            source_embeddings = torch.zeros(1, 1, 768)
-        self.source_embeddings = source_embeddings.cuda().float()
+        source_embeddings /= source_embeddings.norm(dim=-1, keepdim=True)
         target_embeddings /= target_embeddings.norm(dim=-1, keepdim=True)
+        self.source_embeddings = source_embeddings.cuda().float()
         self.target_embeddings = target_embeddings.cuda().float()
         dataset = EmbeddingDataset(self.cfg, self.image_features, self.labels, self.group_labels, self.domain_labels)
         self.dataset = dataset
@@ -274,13 +299,12 @@ class LADS(Augment):
         self.net_checkpoints = []
         self.uid = uuid.uuid4()
         # create generic embeddings for class consistency loss
-        text_embs = zeroshot_classifier([[f"a photo of a {c}"] for c in self.class_names], self.model, model_type=self.cfg.EXP.IMAGE_FEATURES)
+        if self.cfg.DATA.DATASET == 'ColoredMNISTBinary':
+            text_embs = zeroshot_classifier([[f'a photo of the number "{c}"'] for c in self.class_names], self.model, model_type=self.cfg.EXP.IMAGE_FEATURES)
+        else:
+            text_embs = zeroshot_classifier([[f"a photo of a {c}"] for c in self.class_names], self.model, model_type=self.cfg.EXP.IMAGE_FEATURES)
         
         self.class_text_embs = text_embs.float().cuda()
-        if class_weights is not None:
-            self.class_weights = torch.tensor(list(class_weights)).float().cuda()
-        else:
-            self.class_weights = torch.ones(len(self.class_names)).float().cuda()
         self.run() # train augmentation networks
 
     def run(self):
@@ -288,57 +312,19 @@ class LADS(Augment):
             print(f"Training network for {self.prompts[i]}")
             self.train_network(i)
 
-    def directional_loss_builder(self, num_net):
-        """
-        CLIP directional loss from gan NADA paper. Ensures that the difference in
-        image embeddings is similar to the difference in text embeddings of the 
-        source and target domain.
-        """
-        if not self.cfg.AUGMENTATION.GENERIC:
-            delta_t = torch.Tensor(self.text_features[num_net])
-        else:
-            delta_t = torch.Tensor(self.text_features[num_net])
-        delta_t = delta_t.type(torch.float).cuda()
-        print("delta shape ", delta_t.shape, self.text_features.shape)
-        
-        def custom_loss(predictions, labels, targets):
-            total_sum = None
-            delta_i = predictions - labels
-            ctr = 0
-            for i, l in zip(delta_i, targets): 
-                if not self.cfg.AUGMENTATION.GENERIC:
-                    delta_tt = delta_t[l]
-                else:
-                    delta_tt = delta_t
-                ctr += 1
-                if total_sum == None: 
-                    numerator = torch.dot(i, delta_tt)
-                    denominator = torch.norm(i) * torch.norm(delta_tt)
-                    total_sum = 1 - (numerator/denominator)
-                else: 
-                    total_sum += 1 - (torch.dot(i, delta_tt)/ (torch.norm(i) * torch.norm(delta_tt)))
-            return total_sum / ctr
-        return custom_loss
-
     @staticmethod
     def get_class_logits(outputs, class_embs):
         outputs_norm = outputs / outputs.norm(dim=-1, keepdim=True) 
         return torch.matmul(outputs_norm, class_embs)
 
     def train_network(self, num_net): 
-        net = ResMLP(hidden_dim=self.cfg.AUGMENTATION.MODEL.HIDDEN_DIM, input_dim=self.dataset.embedding_dim)
+        net = MLP(hidden_dim=self.cfg.AUGMENTATION.MODEL.HIDDEN_DIM, input_dim=self.dataset.embedding_dim)
         self.nets.append(net.cuda())
         self.net_checkpoints.append("")
 
         self.optimizer = AdamW(self.nets[num_net].parameters(), lr=self.cfg.AUGMENTATION.MODEL.LR, weight_decay=self.cfg.AUGMENTATION.MODEL.WEIGHT_DECAY)
-        # self.directional_loss = DirectionLoss(self.cfg.AUGMENTATION.LOSS_TYPE)
-        self.directional_loss = self.directional_loss_builder(num_net)
-        print(self.class_weights[:5])
-        new_class_weights = self.dataset.class_weights.cuda() * self.class_weights
-        print(new_class_weights.shape, new_class_weights[:5])
-        new_class_weights = new_class_weights / new_class_weights.sum()
-        print(new_class_weights.shape, new_class_weights[:5])
-        self.class_consistency_loss = nn.CrossEntropyLoss(weight=new_class_weights)
+        self.directional_loss = DirectionLoss(self.cfg.AUGMENTATION.LOSS_TYPE)
+        self.class_consistency_loss = nn.CrossEntropyLoss(weight=self.dataset.class_weights.cuda())
         self.regularization_loss = nn.CrossEntropyLoss()
 
         if self.cfg.AUGMENTATION.CLIP_NN_LOSS:
@@ -354,8 +340,6 @@ class LADS(Augment):
                     best_train_loss = val_metrics['val loss']
                     best_epoch = epoch
                     self.net_checkpoints[num_net] = self.save_checkpoint(best_train_loss, epoch, num_net)
-            progress_bar(epoch+1, self.cfg.AUGMENTATION.EPOCHS, 'Epoch: %d | Train Loss: %.3f | Val Loss: %.3f'
-                            % (epoch, train_metrics['train loss'], val_metrics['val loss']))
 
         wandb.summary[f"{self.prompts[num_net]} best epoch"] = best_epoch
         wandb.summary[f"{self.prompts[num_net]} best train_loss"] = best_train_loss
@@ -380,7 +364,6 @@ class LADS(Augment):
         return diffs
 
     def training_loop(self, loader, num_net, epoch, phase='train'):
-        loader_len = len(loader)
         if phase == 'train':
             self.nets[num_net].train()
         else:
@@ -390,11 +373,10 @@ class LADS(Augment):
             for i, (inp, cls_target, cls_group, dom_target) in enumerate(loader):
                 inp, cls_target= inp.cuda().float(), cls_target.cuda().long()
                 cls_outputs = self.nets[num_net](inp)
-                # text_diffs = self.get_direction_vectors(inp, cls_target, num_net)
+                text_diffs = self.get_direction_vectors(inp, cls_target, num_net)
                 im_diffs = cls_outputs - inp
                 # compute directional loss
-                # directional_loss = self.directional_loss(im_diffs / im_diffs.norm(dim=-1, keepdim=True), text_diffs).mean()
-                directional_loss = self.cfg.AUGMENTATION.DOM_WEIGHT * self.directional_loss(cls_outputs, inp, cls_target)
+                directional_loss = self.directional_loss(im_diffs / im_diffs.norm(dim=-1, keepdim=True), text_diffs).mean()
                 cls_emb_targets = self.target_embeddings[num_net].T if self.cfg.AUGMENTATION.DOM_SPECIFIC_XE else self.class_text_embs
                 cls_logits = self.get_class_logits(cls_outputs, cls_emb_targets)
                 cls_consist = self.class_consistency_loss(cls_logits, cls_target)
@@ -410,7 +392,7 @@ class LADS(Augment):
                 train_loss += loss.item()
 
                 total += cls_target.size(0)
-                # progress_bar(i, loader_len, 'Loss: %.3f'% (train_loss/(i+1)))
+                progress_bar(i, len(loader), 'Loss: %.3f'% (train_loss/(i+1)))
 
         metrics = {f"{phase} class loss": train_class_loss/(i+1), f"{phase} directional loss": train_directional_loss/(i+1), f"{phase} loss": train_loss/(i+1), "epoch": epoch}
         wandb.log(metrics)
@@ -439,9 +421,8 @@ class LADS(Augment):
         checkpoint_dir = os.path.join("./checkpoint", self.cfg.DATA.DATASET)
         if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
-        p = self.prompts[num_net][0] if type(self.prompts[num_net]) == list else self.prompts[num_net]
-        path = f'./checkpoint/{self.cfg.DATA.DATASET}/{p.replace(" ", "_")}-{self.cfg.EXP.SEED}-{self.uid}.pth'
-        print(f'Saving checkpoint with acc {acc}...')
+        path = f'./checkpoint/{self.cfg.DATA.DATASET}/{self.prompts[num_net]}-{self.cfg.EXP.SEED}-{self.uid}.pth'
+        print(f'Saving checkpoint with acc {acc} to {path}...')
         state = {
             "acc": acc,
             "epoch": epoch,
@@ -474,11 +455,11 @@ class LADSBias(LADS):
         source and target domain.
         This modification changes the delta depending on
         """
-        def custom_loss(predictions, labels, targets):
+        def custom_loss(predictions, labels, targets, domain_labels):
             total_sum = None
             delta_i = predictions - labels
             ctr = 0
-            for i, d, l in zip(delta_i, targets): 
+            for i, d, l in zip(delta_i, domain_labels, targets): 
                 if d == 0:
                     # delta_tt = self.text_features[1] - self.text_features[0]
                     delta_tt = self.text_features[1][l] - self.text_features[0][l]
@@ -500,7 +481,7 @@ class LADSBias(LADS):
             return total_sum / ctr
         return custom_loss
 
-    def get_direction_vectors(self, img_embs, labels, num_net):
+    def get_direction_vectors(self, img_embs, labels, dom_labels, num_net):
         """
         Returns the direction vectors for the image embeddings by taking the source
         embedding that is most similar to each image embedding and subtracting if from the target.
@@ -508,7 +489,7 @@ class LADSBias(LADS):
         the target domain based on the source domain.
         """
         dir_vectors = []
-        for (im, l, source_idx) in zip(img_embs, labels):
+        for (im, l, source_idx) in zip(img_embs, labels, dom_labels):
             # prod = im @ self.source_embeddings[:,l,:].T
             # _, source_idx = torch.max(prod, dim=0)
             if source_idx == 0:
@@ -596,196 +577,3 @@ class LADSBias(LADS):
                 augmented_filenames += [self.filenames[i], self.filenames[i]]
             return np.array(augmented_features), np.array(augmented_labels), np.array(augmented_domain_labels), np.array(augmented_group_labels), np.array(augmented_filenames)
     
-
-class BiasDirectional(LADS):
-    """
-    This implements the similar directional loss as the directional class, but routes examples
-    based on clips classification of their domain. 
-    """
-    def __init__(self, cfg, image_features, labels, group_labels, domain_labels, filenames, text_features, val_image_features, val_labels, val_group_labels,val_domain_labels, class_weights=None):
-        Augment.__init__(self, cfg, image_features, labels, group_labels, domain_labels, filenames, text_features)
-        print(f"neutral prompts source = {self.neutral_prompts} target = {self.prompts})")
-        source_embeddings, target_embeddings = get_domain_text_embs(self.model, cfg, self.neutral_prompts, self.prompts, self.class_names)
-        print("DONE GETTING EMBEDDINGS")
-        # target_embeddings is size (num_domains, num_classes, emb_size)
-        # source_embeddings is size (num_source_domain_descriptions, num_classes, emb_size)
-        if len(source_embeddings) > 0:
-            source_embeddings /= source_embeddings.norm(dim=-1, keepdim=True)
-        else:
-            source_embeddings = torch.zeros(1, 1, 768)
-        self.source_embeddings = source_embeddings.cuda().float()
-        target_embeddings /= target_embeddings.norm(dim=-1, keepdim=True)
-        self.target_embeddings = target_embeddings.cuda().float()
-        dataset = EmbeddingDataset(self.cfg, self.image_features, self.labels, self.group_labels, self.domain_labels, text_emb=self.target_embeddings)
-        self.dataset = dataset
-        self.train_loader = torch.utils.data.DataLoader(dataset, batch_size=cfg.DATA.BATCH_SIZE, shuffle=True)
-
-        val_dataset = EmbeddingDataset(self.cfg, val_image_features, val_labels, val_group_labels, val_domain_labels)
-        self.val_dataset = val_dataset
-        self.val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=cfg.DATA.BATCH_SIZE, shuffle=True)
-
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.nets = []
-        self.net_checkpoints = []
-        self.uid = uuid.uuid4()
-        # create generic embeddings for class consistency loss
-        text_embs = zeroshot_classifier([[f"a photo of a {c}"] for c in self.class_names], self.model, model_type=self.cfg.EXP.IMAGE_FEATURES)
-        
-        self.class_text_embs = text_embs.float().cuda()
-        if class_weights is not None:
-            self.class_weights = torch.tensor(list(class_weights)).float().cuda()
-        else:
-            self.class_weights = torch.ones(len(self.class_names)).float().cuda()
-        self.run() # train augmentation networks
-        print("num netowrks : ", len(self.nets))
-
-    def run(self):
-        self.train_network(0)
-    
-    def get_nn(self, inputs_unnorm, samples_unnorm, labels, cs=False):
-        """ Gets nearest neighbor of that same class for each img_emb"""
-        inputs = inputs_unnorm / inputs_unnorm.norm(dim=-1, keepdim=True)
-        samples = samples_unnorm / samples_unnorm.norm(dim=-1, keepdim=True)
-        nns, nn_dot_prod = [], []
-        for i, input in enumerate(inputs):
-            if self.cfg.AUGMENTATION.NN_INCLUDE_SAMPLE:
-                assert self.cfg.AUGMENTATION.COMPARE_BEFORE_AUG, "Must compare before augmentation"
-                nn_features = samples
-            else:
-                nn_features = torch.cat([samples[0:i], samples[i+1:]])
-            dot_prod = input @ nn_features.T
-            dot_prod = dot_prod * np.exp(0.007)
-            nns.append(torch.argmax(dot_prod))
-            nn_dot_prod.append(dot_prod)
-        return torch.stack(nns).long(), torch.stack(nn_dot_prod)
-        
-    def directional_loss_builder(self, num_net):
-        """
-        CLIP directional loss from gan NADA paper. Ensures that the difference in
-        image embeddings is similar to the difference in text embeddings of the 
-        source and target domain.
-        This modification changes the delta depending on
-        """
-        def custom_loss(predictions, labels, targets, domain_labels):
-            total_sum = None
-            delta_i = predictions - labels
-            ctr = 0
-            for i, d, l in zip(delta_i, domain_labels, targets): 
-                if d == 0:
-                    # delta_tt = self.text_features[1] - self.text_features[0]
-                    delta_tt = self.text_features[1][l] - self.text_features[0][l]
-                else:
-                    # delta_tt = self.text_features[0] - self.text_features[1]
-                    delta_tt = self.text_features[0][l] - self.text_features[1][l]
-                try:
-                    delta_tt /= np.linalg.norm(delta_tt, axis=-1, keepdims=True)
-                    delta_tt = torch.Tensor(delta_tt).type(torch.float).cuda()
-                except:
-                    delta_tt /= delta_tt.norm(dim=-1, keepdim=True)
-                ctr += 1
-                if total_sum == None: 
-                    numerator = torch.dot(i, delta_tt)
-                    denominator = torch.norm(i) * torch.norm(delta_tt)
-                    total_sum = 1 - (numerator/denominator)
-                else: 
-                    total_sum += 1 - (torch.dot(i, delta_tt)/ (torch.norm(i) * torch.norm(delta_tt)))
-            return total_sum / ctr
-        return custom_loss
-
-    @staticmethod
-    def get_class_logits(outputs, class_embs, dom_labels, dom_specific=False):
-        outputs_norm = outputs / outputs.norm(dim=-1, keepdim=True) 
-        if dom_specific:
-            ret = []
-            for o, d in zip(outputs, dom_labels):
-                idx = 1 if d == 0 else 0
-                ret.append(torch.matmul(o, class_embs[idx].transpose(0, 1)))
-            return torch.stack(ret).cuda()
-        else:
-            return torch.matmul(outputs_norm, class_embs)
-
-    def train_network(self, num_net): 
-        net = ResMLP(hidden_dim=self.cfg.AUGMENTATION.MODEL.HIDDEN_DIM, input_dim=self.dataset.embedding_dim)
-        self.nets.append(net.cuda())
-        self.net_checkpoints.append("")
-
-        cudnn.benchmark = True
-        self.optimizer = AdamW(self.nets[num_net].parameters(), lr=self.cfg.AUGMENTATION.MODEL.LR, weight_decay=self.cfg.AUGMENTATION.MODEL.WEIGHT_DECAY)
-        self.directional_loss = self.directional_loss_builder(num_net)
-        self.class_consistency_loss = nn.CrossEntropyLoss(weight=self.dataset.class_weights.cuda())
-
-        if self.cfg.AUGMENTATION.CLIP_NN_LOSS:
-            self.clip_nn_loss = nn.CrossEntropyLoss()
-
-        self.nets[num_net].train()
-        
-        best_train_loss, best_epoch = 10000, 0
-        for epoch in range(self.cfg.AUGMENTATION.EPOCHS):
-            train_metrics = self.training_loop(num_net, epoch)
-            if train_metrics['train loss'] < best_train_loss:
-                    best_train_loss = train_metrics['train loss']
-                    best_epoch = epoch
-                    self.net_checkpoints[num_net] = self.save_checkpoint(best_train_loss, epoch, num_net)
-
-        wandb.summary[f"{self.prompts[num_net]} best epoch"] = best_epoch
-        wandb.summary[f"{self.prompts[num_net]} best train_loss"] = best_train_loss
-
-    def training_loop(self, num_net, epoch):
-        train_directional_loss, train_class_loss, train_nn_loss, train_loss, cls_correct, total = 0, 0, 0, 0, 0, 0
-        for i, (inp, cls_target, cls_group, dom_target) in enumerate(self.train_loader):
-            inp, cls_target= inp.cuda().float(), cls_target.cuda().long()
-            self.optimizer.zero_grad()
-            cls_outputs = self.nets[num_net](inp)
-            # compute directional loss
-            directional_loss = self.directional_loss(cls_outputs, inp, cls_target, dom_target)
-
-            cls_logits = self.get_class_logits(cls_outputs, self.class_text_embs, dom_target, self.cfg.AUGMENTATION.DOM_SPECIFIC_XE)
-            cls_consist = self.class_consistency_loss(cls_logits, cls_target)
-            loss = self.cfg.AUGMENTATION.DOM_WEIGHT * self.alpha * directional_loss + (1 - self.alpha) * cls_consist
-            train_class_loss += (1 - self.alpha) * cls_consist
-            train_directional_loss += self.cfg.AUGMENTATION.DOM_WEIGHT * self.alpha * directional_loss.item()
-
-            if self.cfg.AUGMENTATION.CLIP_NN_LOSS:
-                nn_labels, _ = self.get_nn(inp, inp, cls_target)
-                if self.cfg.AUGMENTATION.COMPARE_BEFORE_AUG:
-                    _, nn_logits = self.get_nn(cls_outputs, inp, cls_target)
-                else:
-                    _, nn_logits = self.get_nn(cls_outputs, cls_outputs, cls_target)
-                nn_loss = self.cfg.AUGMENTATION.NN_WEIGHT * self.clip_nn_loss(nn_logits, nn_labels)
-                loss += nn_loss
-                train_nn_loss += nn_loss.item()
-        
-            loss.backward(retain_graph=True)
-            self.optimizer.step()
-            
-            train_loss += loss.item() 
-
-            total += cls_target.size(0)
-            progress_bar(i, len(self.train_loader), 'Loss: %.3f'
-                            % (train_loss/(i+1)))
-
-        metrics = {"train class loss": train_class_loss/(i+1), "train directional loss": train_directional_loss/(i+1), "train nn loss": train_nn_loss/(i+1), "train loss": train_loss/(i+1), "epoch": epoch}
-        wandb.log(metrics)
-        return metrics
-
-    @staticmethod
-    def get_inv(label):
-        return 1 if label == 0 else 0
-
-    def augment_dataset(self):
-        """
-        Augments the dataset
-        """
-        augmented_features = []
-        augmented_labels = []
-        augmented_domain_labels = []
-        augmented_group_labels = []
-        augmented_filenames = []
-        for i, feature in enumerate(self.image_features):
-            augmented_features += self.augment_single(feature, self.labels[i])
-
-            augmented_labels += [self.labels[i], self.labels[i]]
-            augmented_domain_labels += [self.domain_labels[i], self.get_inv(self.domain_labels[i])]
-            augmented_group_labels += [self.group_labels[i], self.get_inv(self.group_labels[i])]
-            augmented_filenames += [self.filenames[i], self.filenames[i]]
-        return np.array(augmented_features), np.array(augmented_labels), np.array(augmented_domain_labels), np.array(augmented_group_labels), np.array(augmented_filenames)

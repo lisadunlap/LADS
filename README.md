@@ -3,7 +3,7 @@ Official Implementation of [LADS (Latent Augmentation using Domain descriptionS)
 
 ![LADS method overview.](figs/lads-method-2-1.png "LADS method overview")
 
-*WARNING: this is still WIP, please raise an issue or email me if you run into any bugs.*
+*WARNING: this is still WIP, please raise an issue if you run into any bugs.*
 
 ```
 @article{dunlap2023lads,
@@ -13,14 +13,6 @@ Official Implementation of [LADS (Latent Augmentation using Domain descriptionS)
   year={2023}
 }
 ```
-
-## TODOs
-[X] clean up emb saving/loading
-[] fix the Directional vs LADS acc diff
-[X] add e2e method for DA
-[] get E2E to work well
-[X] add in selective augmentation (run lp, check per class acc, augment poor performing finetuned classes more towards the text emb)
-[] run 2 layer mlp baselines
 
 ## Getting started
 
@@ -38,21 +30,30 @@ Official Implementation of [LADS (Latent Augmentation using Domain descriptionS)
 ## Code Structure 
 The configurations for each method are in the `configs` folder. To try say the baseline of doing normal LR on the CLIP embeddings:
 ```
-python main.py --config configs/Waterbirds/base.yaml
+python main.py --config configs/Waterbirds/mlp.yaml 
 ```
 
+you can also override parameters like so
+```
+python main.py --config configs/Waterbirds/mlp.yaml METHOD.MODEL.LR=0.1 EXP.PROJ=new_project
+```
+
+### Datasets
+
 Datasets supported are in the [helpers folder](./helpers/data_helpers.py). Currently they are:
-* Waterbirds (100% and 95%)
-* ColoredMNIST (LNTL version and simplified version)
-* DomainNet
-* CUB Paintings
-* OfficeHome
+* Waterbirds (100% and 95%) [our specific split](https://drive.google.com/file/d/1zJpQYGEt1SuwitlNfE06TFyLaWX-st1k/view) [code to generate data](https://github.com/kohpangwei/group_DRO)
+* ColoredMNIST (LNTL version and simplified version) NOTEBOOK COMING SOON
+* DomainNet (the version used in the paper is `DATA.DATASET=DomainNetMini`) [full dataset](http://ai.bu.edu/DomainNet/)
+* CUB Paintings [photos dataset](https://www.vision.caltech.edu/datasets/cub_200_2011/) [paintings dataset](https://github.com/thuml/PAN)
+* OfficeHome COMING SOON
 
-You can download the CLIP embeddings of these datasets [here](https://drive.google.com/drive/folders/1ItjhX7RPfQ6fQQk6_bEYJPewnkVdcfOC?usp=sharing)
+You can download the CLIP embeddings of these datasets [here](https://drive.google.com/drive/folders/1ItjhX7RPfQ6fQQk6_bEYJPewnkVdcfOC?usp=sharing). We also have the embeddings for CUB, Waterbirds, and DomainNetMini in the [embeddings](./embeddings/) folder.
 
-Since computing the CLIP embeddings for each train/val/test set is time consuming, you can store the embeddings by setting `DATA.LOAD_CACHED=False` and `DATA.SAVE_PATH=[path you want to save to]`
+Since computing the CLIP embeddings for each train/val/test set is time consuming, you can store the embeddings by setting `DATA.LOAD_CACHED=False`, then it should store the embeddings into a file `embeddings/{dataset}/clip_{openai,LAION}_{model_name}`
 
-Then, add the path to the saved embeddings to DATASET_PATHS in [data_helpers](./helpers/data_helpers.py) and set `DATA.LOAD_CACHED=Tue` in your yaml file
+### Methods
+
+All the augmenation methods (i.e. LADS and BiasLADS) are in `methods/augmentations`, while the classifiers and baselines are in `methods/clip_transformations.py`
 
 More description of each method and the config files in the config folder. 
 

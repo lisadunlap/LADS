@@ -85,36 +85,13 @@ else:
     model = model.to(device)
 
 # # load data
-# if args.DATA.LOAD_CACHED:
-#     cache_file = f"{args.DATA.SAVE_PATH}/{args.DATA.DATASET}/{args.EXP.IMAGE_FEATURES}_{args.EXP.CLIP_PRETRAINED_DATASET}_{args.EXP.CLIP_MODEL.replace('/','_')}.pt"
-#     dataset_classes, dataset_domains = dh.DATASET_CLASSES[args.DATA.DATASET], dh.DATASET_DOMAINS[args.DATA.DATASET]
-#     assert os.path.exists(cache_file), f"{cache_file} does not exist. To compute embeddings, set DATA.LOAD_CACHED=False"
-#     print(f"Loading cached embeddings from {cache_file}")
-#     train_features, train_labels, train_groups, train_domains, train_filenames, val_features, val_labels, val_groups, val_domains, val_filenames, test_features, test_labels, test_groups, test_domains, test_filenames = load_embeddings(cache_file, args.DATA.DATASET)
-# load data
-# if args.DATA.LOAD_CACHED:
-#     print(args.DATA.LOAD_CACHED)
-#     if args.EXP.IMAGE_FEATURES == 'clip' or args.EXP.IMAGE_FEATURES == 'openclip':
-#         model_name = args.EXP.CLIP_MODEL
-#     else:
-#         model_name = args.EXP.IMAGE_FEATURES
-#     cache_file, dataset_classes, dataset_domains = dh.get_cache_file(DATASET_NAME, model_name, args.EXP.IMAGE_FEATURES)
-#     assert os.path.exists(cache_file), f"{cache_file} does not exist. To compute embeddings, set DATA.LOAD_CACHED=False"
-#     data = torch.load(cache_file)
-#     train_features, train_labels, train_groups, train_domains, train_filenames = data['train_features'], data['train_labels'], data['train_groups'], data['train_domains'], data['train_filenames']
-#     val_features, val_labels, val_groups, val_domains, val_filenames = data['val_features'], data['val_labels'], data['val_groups'], data['val_domains'], data['val_filenames']
-#     test_features, test_labels, test_groups, test_domains, test_filenames = data['test_features'], data['test_labels'], data['test_groups'], data['test_domains'], data['test_filenames']
-#     # move some val data to test 
-#     if args.DATA.DATASET != 'ColoredMNISTBinary':
-#         val_features, val_labels, val_groups, val_domains, val_filenames = data['val_features'][::2], data['val_labels'][::2], data['val_groups'][::2], data['val_domains'][::2], data['val_filenames'][::2]
-#         test_features, test_labels, test_groups, test_domains, test_filenames = np.concatenate((data['test_features'], data['val_features'][1::2])), np.concatenate((data['test_labels'], data['val_labels'][1::2])), np.concatenate((data['test_groups'], data['val_groups'][1::2])), np.concatenate((data['test_domains'], data['val_domains'][1::2])), np.concatenate((data['test_filenames'], data['val_filenames'][1::2]))
 cache_file = f"{args.DATA.SAVE_PATH}/{args.DATA.DATASET}/{args.EXP.IMAGE_FEATURES}_{args.EXP.CLIP_PRETRAINED_DATASET}_{args.EXP.CLIP_MODEL.replace('/','_')}.pt"
 dataset_classes, dataset_domains = dh.DATASET_CLASSES[args.DATA.DATASET], dh.DATASET_DOMAINS[args.DATA.DATASET]
 if os.path.exists(cache_file):
     print(f"Loading cached embeddings from {cache_file}")
     train_features, train_labels, train_groups, train_domains, train_filenames, val_features, val_labels, val_groups, val_domains, val_filenames, test_features, test_labels, test_groups, test_domains, test_filenames = load_embeddings(cache_file, args.DATA.DATASET)
 else:
-    # print(f"Computing embeddings and saving to {cache_file}")
+    print(f"Computing embeddings and saving to {cache_file}")
     trainset, valset, testset = dh.get_dataset(DATASET_NAME, preprocess)
     dataset_classes, dataset_domains = dh.get_class(DATASET_NAME), dh.get_domain(DATASET_NAME)
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=cfg.DATA.BATCH_SIZE, shuffle=True)
@@ -154,7 +131,7 @@ if len(neutral_prompts) >0 and type(neutral_prompts[0]) == omegaconf.listconfig.
 print("Advice Method", args.EXP.ADVICE_METHOD)
 bias_correction = getattr(CLIPTransformations, args.EXP.ADVICE_METHOD)(prompts, clip_model, args, neutral_prompts)
 
-# old_train_features, old_train_labels, old_train_groups, old_train_domains, old_train_filenames = train_features, train_labels, train_groups, train_domains, train_filenames
+
 old_val_features, old_val_labels, old_val_groups, old_val_domains, old_val_filenames = val_features, val_labels, val_groups, val_domains, val_filenames
 old_test_features, old_test_labels, old_test_groups, old_test_domains, old_test_filenames = test_features, test_labels, test_groups, test_domains, test_filenames
 
@@ -251,10 +228,8 @@ for i in range(len(domain_accuracy)):
 print(f"Test accuracy: {group_accuracy} \n Test domain accuracy: {domain_accuracy}")
 
 if 'E2E' in args.EXP.ADVICE_METHOD:
-    # features, labels, groups, domains, filenames = np.concatenate([old_val_features, old_test_features]), np.concatenate([old_val_labels, old_test_labels]), np.concatenate([old_val_groups, old_test_groups]), np.concatenate([old_val_domains, old_test_domains]), np.concatenate([old_val_filenames, old_test_filenames])
     aug_features, aug_labels, aug_domains, aug_filenames = bias_correction.augment_dataset(train_features, train_labels, train_domains, train_filenames)
     sample_idxs = random.sample(list(range(len(aug_filenames))), 1000)
-    # print("SAMPLE SHAPE: ", sample_filenames.shape, sample_domains.shape)
     sample_features, sample_domains, sample_labels, sample_filenames = aug_features[sample_idxs], aug_domains[sample_idxs], aug_labels[sample_idxs], aug_filenames[sample_idxs]
     neighbor_domains, neighbor_labels, domain_acc, class_acc, neighbor_samples, prop_unique, mean_cs = get_nn_metrics(sample_features, sample_domains, sample_labels, old_test_features, old_test_domains, old_test_labels)
     wandb.log({"mean CS for NN": mean_cs})
@@ -262,7 +237,6 @@ if 'E2E' in args.EXP.ADVICE_METHOD:
     plt.rcParams["figure.figsize"] = (20,5)
     f, (axs_orig, axs_new) = plt.subplots(2, 10, sharey=True)
     for i, (original_idx, sample_idx) in enumerate(neighbor_samples):
-        # try:
         print(sample_filenames[original_idx])
         axs_orig[i].imshow(Image.open(sample_filenames[original_idx]).resize((224, 224)))
         axs_orig[i].set_title(f"{dataset_domains[int(sample_domains[int(original_idx)])]} - {sample_labels[int(original_idx)]}")
@@ -270,7 +244,5 @@ if 'E2E' in args.EXP.ADVICE_METHOD:
         axs_new[i].imshow(Image.open(old_test_filenames[sample_idx]).resize((224, 224)))
         axs_new[i].set_title(f"{dataset_domains[int(old_test_domains[int(sample_idx)])]} - {old_test_labels[int(sample_idx)]}")
         axs_new[i].axis('off')
-        # except:
-        #     print(f"sample idx {sample_idx} is not a valid index")
     wandb.log({"train features NN": wandb.Image(f), "domain consistency acc": domain_acc, "class consistency acc": class_acc, "unique nn": prop_unique})
     wandb.sklearn.plot_confusion_matrix(sample_domains, neighbor_domains, dataset_domains)

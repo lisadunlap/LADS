@@ -5,6 +5,15 @@ Official Implementation of [LADS (Latent Augmentation using Domain descriptionS)
 
 *WARNING: this is still WIP, please raise an issue if you run into any bugs.*
 
+```
+@article{dunlap2023lads,
+  title={Using Language to Entend to Unseen Domains},
+  author = {Dunlap, Lisa and Mohri, Clara and Guillory, Devin and Zhang, Han and Darrell, Trevor and Gonzalez, Joseph E. and Raghunathan, Aditi and Rohrbach, Anja},
+  journal={International Conference on Learning Representations (ICLR)},
+  year={2023}
+}
+```
+
 ## Getting started
 
 1. Install the dependencies for our code using Conda. You may need to adjust the environment YAML file depending on your setup.
@@ -26,7 +35,7 @@ python main.py --config configs/Waterbirds/mlp.yaml
 
 Datasets supported are in the [helpers folder](./helpers/data_helpers.py). Currently they are:
 * Waterbirds (100% and 95%) [our specific split](https://drive.google.com/file/d/1zJpQYGEt1SuwitlNfE06TFyLaWX-st1k/view) [code to generate data](https://github.com/kohpangwei/group_DRO)
-* ColoredMNIST (LNTL version and simplified version) NOTEBOOK COMING SOON
+* ColoredMNIST (LNTL version and simplified version) [Paper Dataset](https://drive.google.com/file/d/1GomKfufFrXIRAFJNedUBCDwHW2X9NTP-/view?usp=share_link)
 * DomainNet (the version used in the paper is `DATA.DATASET=DomainNetMini`) [full dataset](http://ai.bu.edu/DomainNet/)
 * CUB Paintings [photos dataset](https://www.vision.caltech.edu/datasets/cub_200_2011/) [paintings dataset](https://github.com/thuml/PAN)
 * OfficeHome COMING SOON

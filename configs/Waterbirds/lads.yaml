@@ -6,7 +6,7 @@ EXP:
   TEXT_PROMPTS: [['a photo of a {} on forest.'], ['a photo of a {} on water.']]
   NEUTRAL_TEXT_PROMPTS: []
   AUGMENTATION: 'BiasDirectional'
-  EPOCHS: 200
+  EPOCHS: 400
   CHECKPOINT_VAL: True
   ENSAMBLE: False
   

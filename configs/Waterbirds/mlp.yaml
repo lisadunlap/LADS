@@ -5,7 +5,7 @@ EXP:
   SEED: 0
   TEXT_PROMPTS: ['a photo of a {} on forest.', 'a photo of a {} on water.']
   NEUTRAL_TEXT_PROMPTS: ['a photo of a {}.']
-  EPOCHS: 200
+  EPOCHS: 400
   BIASED_VAL: 
 
 DATA:

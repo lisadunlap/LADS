@@ -9,26 +9,6 @@ import torchvision
 from omegaconf import OmegaConf
 import torch.nn.functional as F
 
-class Predictor(nn.Module):
-    def __init__(self, input_ch=32, num_classes=8):
-        super(Predictor, self).__init__()
-        self.pred_conv1 = nn.Conv2d(input_ch, input_ch, kernel_size=3,
-                                    stride=1, padding=1)
-        self.pred_bn1   = nn.BatchNorm2d(input_ch)
-        self.relu       = nn.ReLU(inplace=True)
-        self.pred_conv2 = nn.Conv2d(input_ch, num_classes, kernel_size=3,
-                                    stride=1, padding=1)
-        self.softmax    = nn.Softmax(dim=1)
-
-    def forward(self, x):
-        x = self.pred_conv1(x)
-        x = self.pred_bn1(x)
-        x = self.relu(x)
-        x = self.pred_conv2(x)
-        px = self.softmax(x)
-
-        return x,px
-
 class MLP(nn.Module):
     def __init__(self, cfg):
         super(MLP, self).__init__()
@@ -57,6 +37,9 @@ class MLP(nn.Module):
         return h
 
 class MPLZS(MLP):
+    """
+    MLP initialized with CLIP text embeddings
+    """
     def __init__(self, cfg, text_embeddings):
         super(MPLZS, self).__init__(cfg)
         assert self.num_layers == 1, 'Only one layer supported'
@@ -117,7 +100,9 @@ def convert_weights(model: nn.Module):
     model.apply(_convert_weights_to_fp16)
 
 class CLIPFinetune(nn.Module):
-
+    """
+    Finetune the CLIP backbone. This theoretically should be usable....
+    """
     def __init__(self, clip_model, num_classes=8):
         super(CLIPFinetune, self).__init__()
         convert_weights(clip_model)

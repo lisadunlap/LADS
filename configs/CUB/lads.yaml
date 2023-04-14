@@ -14,6 +14,7 @@ DATA:
   DATASET: "CUB"
   LOAD_CACHED: True
   BATCH_SIZE: 256
+  SAVE_PATH: 'embeddings/CUB/recomputed.pth'
 
 METHOD:
   MODEL:
@@ -27,7 +28,7 @@ METHOD:
 
 AUGMENTATION:
   MODEL:
-    LR: 0.1
+    LR: 0.001
     WEIGHT_DECAY: 0.05
     NUM_LAYERS: 1
   GENERIC: False

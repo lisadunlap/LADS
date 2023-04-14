@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import random
 import omegaconf
 from omegaconf import OmegaConf
+import collections
 
 import helpers.data_helpers as dh
 import methods.clip_transformations as CLIPTransformations
@@ -37,7 +38,7 @@ if len(unknown) > 0:
 args.yaml = flags.config
 
 assert args.EXP.ADVICE_METHOD != 'CNN', "main.py not for CNN baseline, use train.py"
-assert args.EXP.ADVICE_METHOD != 'CLIPZS', "main.py not for CLIP zero-shot, use clip_zs.py"
+# assert args.EXP.ADVICE_METHOD != 'CLIPZS', "main.py not for CLIP zero-shot, use clip_zs.py"
 
 if args.EXP.WANDB_SILENT:
     os.environ['WANDB_SILENT']="true"
@@ -66,13 +67,14 @@ random.seed(args.EXP.SEED)
 DATASET_NAME = args.DATA.DATASET
 
 # load data
-if args.DATA.LOAD_CACHED:
-    print(args.DATA.LOAD_CACHED)
+cache_file = f"{args.DATA.SAVE_PATH}/{args.DATA.DATASET}/{args.EXP.IMAGE_FEATURES}_{args.EXP.CLIP_PRETRAINED_DATASET}_{args.EXP.CLIP_MODEL.replace('/','_')}.pt"
+if os.path.exists(cache_file):
     if args.EXP.IMAGE_FEATURES == 'clip' or args.EXP.IMAGE_FEATURES == 'openclip':
         model_name = args.EXP.CLIP_MODEL
     else:
         model_name = args.EXP.IMAGE_FEATURES
     cache_file, dataset_classes, dataset_domains = dh.get_cache_file(DATASET_NAME, model_name, args.EXP.BIASED_VAL, args.EXP.IMAGE_FEATURES)
+    print(f"loading embeddings from {cache_file}")
     assert os.path.exists(cache_file), f"{cache_file} does not exist. To compute embeddings, set DATA.LOAD_CACHED=False"
     data = torch.load(cache_file)
     train_features, train_labels, train_groups, train_domains, train_filenames = data['train_features'], data['train_labels'], data['train_groups'], data['train_domains'], data['train_filenames']
@@ -82,6 +84,11 @@ if args.DATA.LOAD_CACHED:
     if args.DATA.DATASET != 'ColoredMNISTBinary':
         val_features, val_labels, val_groups, val_domains, val_filenames = data['val_features'][::2], data['val_labels'][::2], data['val_groups'][::2], data['val_domains'][::2], data['val_filenames'][::2]
         test_features, test_labels, test_groups, test_domains, test_filenames = np.concatenate((data['test_features'], data['val_features'][1::2])), np.concatenate((data['test_labels'], data['val_labels'][1::2])), np.concatenate((data['test_groups'], data['val_groups'][1::2])), np.concatenate((data['test_domains'], data['val_domains'][1::2])), np.concatenate((data['test_filenames'], data['val_filenames'][1::2]))
+
+    # print out group counts
+    print("Train groups:", collections.Counter(train_groups))
+    print("Val groups:", collections.Counter(val_groups))
+    print("Test groups:", collections.Counter(test_groups))
     if args.METHOD.NORMALIZE:
         train_features /= np.linalg.norm(train_features, axis=-1, keepdims=True)
         val_features /= np.linalg.norm(val_features, axis=-1, keepdims=True)
@@ -163,7 +170,9 @@ if args.EXP.AUGMENTATION != None and args.EXP.AUGMENTATION != 'None':
     print("Training set augmented!")
 print("SIZE of embeddings ", train_features.shape, train_domains.shape)
 
-if args.EXP.LOG_NN:
+
+# Logs the Nearest Neighbors in the Extended Domain
+if args.EXP.LOG_NN and args.EXP.ADVICE_METHOD != 'CLIPZS':
         features, labels, groups, domains, filenames = np.concatenate([old_val_features, old_test_features]), np.concatenate([old_val_labels, old_test_labels]), np.concatenate([old_val_groups, old_test_groups]), np.concatenate([old_val_domains, old_test_domains]), np.concatenate([old_val_filenames, old_test_filenames])
         # features, labels, groups, domains, filenames = old_test_features, old_test_labels, old_test_groups, old_test_domains, old_test_filenames
         if len(np.unique(train_domains)) > 1:

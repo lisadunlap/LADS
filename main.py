@@ -15,7 +15,7 @@ from omegaconf import OmegaConf
 import helpers.data_helpers as dh
 import methods.clip_transformations as CLIPTransformations
 from utils import read_unknowns, nest_dict
-from clip_utils import *
+from clip_utils import get_features, evaluate, zeroshot_classifier, get_ensamble_preds, get_pred_overlap, get_nn_metrics
 import methods.augmentations
 
 parser = argparse.ArgumentParser(description='CLIP Advice')
@@ -37,7 +37,6 @@ if len(unknown) > 0:
 args.yaml = flags.config
 
 assert args.EXP.ADVICE_METHOD != 'CNN', "main.py not for CNN baseline, use train.py"
-# assert args.EXP.ADVICE_METHOD != 'CLIPZS', "main.py not for CLIP zero-shot, use clip_zs.py"
 
 if args.EXP.WANDB_SILENT:
     os.environ['WANDB_SILENT']="true"
@@ -72,13 +71,13 @@ DATASET_NAME = args.DATA.DATASET
 
 # Load the model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# clip_model, preprocess = clip.load(args.EXP.CLIP_MODEL, device)
+
 if args.EXP.IMAGE_FEATURES == 'clip':
     clip_model, preprocess = clip.load(args.EXP.CLIP_MODEL, device)
     model, preprocess = clip.load(args.EXP.CLIP_MODEL, device)
 elif args.EXP.IMAGE_FEATURES == 'openclip':
     model, _, preprocess = open_clip.create_model_and_transforms(args.EXP.CLIP_MODEL, pretrained=args.EXP.CLIP_PRETRAINED_DATASET)
-    model = model.to(torch.device('cuda:0'))
+    model = model.to(torch.device('cuda'))
     clip_model = model
 else:
     model = getattr(torchvision.models, args.EXP.IMAGE_FEATURES)(pretrained=True)
@@ -160,11 +159,6 @@ if args.EXP.LOG_NN:
         features, labels, groups, domains, filenames = np.concatenate([old_val_features, old_test_features]), np.concatenate([old_val_labels, old_test_labels]), np.concatenate([old_val_groups, old_test_groups]), np.concatenate([old_val_domains, old_test_domains]), np.concatenate([old_val_filenames, old_test_filenames])
         if len(np.unique(train_domains)) > 1:
             filtered_idxs = np.where(train_domains != train_domains[0])
-            print(train_features.shape)
-            print( train_features[filtered_idxs])
-            print(train_domains[filtered_idxs])
-            print(train_labels[filtered_idxs])
-            print(train_filenames[filtered_idxs])
             sample_features, sample_domains, sample_labels, sample_filenames = train_features[filtered_idxs], train_domains[filtered_idxs], train_labels[filtered_idxs], train_filenames[filtered_idxs]
             sample_idxs = random.sample(list(range(len(sample_filenames))), min((len(train_filenames), 1000)))
             sample_features, sample_domains, sample_labels, sample_filenames = sample_features[sample_idxs], sample_domains[sample_idxs], sample_labels[sample_idxs], sample_filenames[sample_idxs]

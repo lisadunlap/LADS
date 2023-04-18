@@ -44,7 +44,7 @@ python main.py --config configs/Waterbirds/mlp.yaml METHOD.MODEL.LR=0.1 EXP.PROJ
 
 Datasets supported are in the [helpers folder](./helpers/data_helpers.py). Currently they are:
 * Waterbirds (100% and 95%) [our specific split](https://drive.google.com/file/d/1zJpQYGEt1SuwitlNfE06TFyLaWX-st1k/view) [code to generate data](https://github.com/kohpangwei/group_DRO)
-* ColoredMNIST (Red/Blue color ) NOTEBOOK COMING SOON
+* ColoredMNIST [Red/Blue color](https://drive.google.com/file/d/1GomKfufFrXIRAFJNedUBCDwHW2X9NTP-/view?usp=share_link) NOTEBOOK COMING SOON 
 * DomainNet (the version used in the paper is `DATA.DATASET=DomainNetMini`) [full dataset](http://ai.bu.edu/DomainNet/)
 * CUB Paintings [photos dataset](https://www.vision.caltech.edu/datasets/cub_200_2011/) [paintings dataset](https://github.com/thuml/PAN)
 * OfficeHome COMING SOON

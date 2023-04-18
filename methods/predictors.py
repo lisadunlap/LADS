@@ -76,3 +76,57 @@ class ResMLP(nn.Module):
             h = nnf.relu(self.fc2(h))
             h = self.fc3(h)
         return x + h
+
+def convert_weights(model: nn.Module):
+    """Convert applicable model parameters to fp16"""
+
+    def _convert_weights_to_fp16(l):
+        if isinstance(l, (nn.Conv1d, nn.Conv2d, nn.Linear)):
+            l.weight.data = l.weight.data.float()
+            if l.bias is not None:
+                l.bias.data = l.bias.data.float()
+
+        if isinstance(l, nn.MultiheadAttention):
+            for attr in [*[f"{s}_proj_weight" for s in ["in", "q", "k", "v"]], "in_proj_bias", "bias_k", "bias_v"]:
+                tensor = getattr(l, attr)
+                if tensor is not None:
+                    tensor.data = tensor.data.float()
+
+        for name in ["text_projection", "proj"]:
+            if hasattr(l, name):
+                attr = getattr(l, name)
+                if attr is not None:
+                    attr.data = attr.data.float()
+
+    model.apply(_convert_weights_to_fp16)
+
+class CLIPFinetune(nn.Module):
+    """
+    Finetune the CLIP backbone. This theoretically should be usable....
+    """
+    def __init__(self, clip_model, num_classes=8):
+        super(CLIPFinetune, self).__init__()
+        convert_weights(clip_model)
+        self.clip_model = clip_model
+        self.fc = nn.Linear(clip_model.output_dim, num_classes)
+
+    def forward(self, x):
+        x = self.clip_model(x)
+        x = self.fc(x)
+        return x
+
+
+class SALEME2E(nn.Module):
+
+    def __init__(self, clip_model, config, num_classes=8):
+        super(SALEME2E, self).__init__()
+        self.backbone = clip_model
+        self.augmentation_net = MLP(config['augmentation_config'])
+        self.classifier = MLP(config['classifier_config'])
+
+    def forward(self, x):
+        img_emb = self.backbone(x)
+        aug_img_emb = self.augmentation_net(x)
+        out_real = self.classifier(img_emb)
+        out_aug = self.classifier(aug_img_emb)
+        return img_emb, aug_img_emb, out_real, out_aug

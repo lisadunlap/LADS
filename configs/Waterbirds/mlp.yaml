@@ -6,11 +6,11 @@ EXP:
   TEXT_PROMPTS: ['a photo of a {} on forest.', 'a photo of a {} on water.']
   NEUTRAL_TEXT_PROMPTS: ['a photo of a {}.']
   EPOCHS: 200
-  BIASED_VAL: 
 
 DATA:
   DATASET: "Waterbirds"
   BATCH_SIZE: 256
+  ROOT: /shared/lisabdunlap/vl-attention/data
   LOAD_CACHED: True
 
 METHOD:
@@ -18,7 +18,6 @@ METHOD:
     NUM_LAYERS: 1
     DOM_WEIGHT: 1.0
     LR: 0.001
-    # WEIGHT_DECAY: 0.005
     CHECKPOINT: 'checkpoint/mlp.pth'
     CHECKPOINT_NAME: "mlp"
     RESUME: False

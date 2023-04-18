@@ -5,29 +5,7 @@ import math
 import torch.utils.model_zoo as model_zoo
 import clip
 import torchvision
-
-from omegaconf import OmegaConf
 import torch.nn.functional as F
-
-class Predictor(nn.Module):
-    def __init__(self, input_ch=32, num_classes=8):
-        super(Predictor, self).__init__()
-        self.pred_conv1 = nn.Conv2d(input_ch, input_ch, kernel_size=3,
-                                    stride=1, padding=1)
-        self.pred_bn1   = nn.BatchNorm2d(input_ch)
-        self.relu       = nn.ReLU(inplace=True)
-        self.pred_conv2 = nn.Conv2d(input_ch, num_classes, kernel_size=3,
-                                    stride=1, padding=1)
-        self.softmax    = nn.Softmax(dim=1)
-
-    def forward(self, x):
-        x = self.pred_conv1(x)
-        x = self.pred_bn1(x)
-        x = self.relu(x)
-        x = self.pred_conv2(x)
-        px = self.softmax(x)
-
-        return x,px
 
 class MLP(nn.Module):
     def __init__(self, cfg):
@@ -55,8 +33,11 @@ class MLP(nn.Module):
             h = nnf.relu(self.fc2(h))
             h = self.fc3()
         return h
-
+    
 class MPLZS(MLP):
+    """
+    MLP initialized with CLIP text embeddings
+    """
     def __init__(self, cfg, text_embeddings):
         super(MPLZS, self).__init__(cfg)
         assert self.num_layers == 1, 'Only one layer supported'
@@ -67,19 +48,22 @@ class MPLZS(MLP):
         self.fc.bias.requires_grad = True
 
 class ResMLP(nn.Module):
-    def __init__(self, cfg):
+    """
+    We didn't end up using this because it didn't seem to help, but it's here if you want to try it.
+    """
+    def __init__(self, input_dim=768, hidden_dim=384, num_layers=1):
         super(ResMLP, self).__init__()
-        self.num_layers = cfg["num_layers"]
+        self.num_layers = num_layers
         assert self.num_layers in [1,2,3], 'Only one or two # layers supported'
         if self.num_layers == 1:
-            self.fc = nn.Linear(cfg["in_dim"], cfg["out_dim"])
+            self.fc = nn.Linear(input_dim, input_dim)
         elif self.num_layers == 2:
-            self.fc1 = nn.Linear(cfg["in_dim"], cfg["h_dim"])
-            self.fc2 = nn.Linear(cfg["h_dim"], cfg["out_dim"])
+            self.fc1 = nn.Linear(input_dim, hidden_dim)
+            self.fc2 = nn.Linear(hidden_dim, input_dim)
         else:
-            self.fc1 = nn.Linear(cfg["in_dim"], cfg["h_dim"])
-            self.fc2 = nn.Linear(cfg["h_dim"], cfg["h_dim"])
-            self.fc3 = nn.Linear(cfg["h_dim"], cfg["out_dim"])
+            self.fc1 = nn.Linear(input_dim, hidden_dim)
+            self.fc2 = nn.Linear(hidden_dim, input_dim)
+            self.fc3 = nn.Linear(hidden_dim, input_dim)
 
     def forward(self, x):
         if self.num_layers == 1:
@@ -117,7 +101,9 @@ def convert_weights(model: nn.Module):
     model.apply(_convert_weights_to_fp16)
 
 class CLIPFinetune(nn.Module):
-
+    """
+    Finetune the CLIP backbone. This theoretically should be usable....
+    """
     def __init__(self, clip_model, num_classes=8):
         super(CLIPFinetune, self).__init__()
         convert_weights(clip_model)

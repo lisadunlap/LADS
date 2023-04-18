@@ -5,6 +5,15 @@ Official Implementation of [LADS (Latent Augmentation using Domain descriptionS)
 
 *WARNING: this is still WIP, please raise an issue if you run into any bugs.*
 
+```
+@article{dunlap2023lads,
+  title={Using Language to Entend to Unseen Domains},
+  author = {Dunlap, Lisa and Mohri, Clara and Guillory, Devin and Zhang, Han and Darrell, Trevor and Gonzalez, Joseph E. and Raghunathan, Aditi and Rohrbach, Anja},
+  journal={International Conference on Learning Representations (ICLR)},
+  year={2023}
+}
+```
+
 ## Getting started
 
 1. Install the dependencies for our code using Conda. You may need to adjust the environment YAML file depending on your setup.
@@ -16,26 +25,37 @@ Official Implementation of [LADS (Latent Augmentation using Domain descriptionS)
 
 3. Compute and store CLIP embeddings for each dataset (see below)
 
-4. Run one of the config files and be amazed (or midly impressed) by what LADS can do
+4. Create an account with [Weights and Biases](wandb.ai) if you don't already have one. 
+
+5. Run one of the config files and be amazed (or midly impressed) by what LADS can do!
 
 ## Code Structure 
 The configurations for each method are in the `configs` folder. To try say the baseline of doing normal LR on the CLIP embeddings:
 ```
-python main.py --config configs/Waterbirds/mlp.yaml
+python main.py --config configs/Waterbirds/mlp.yaml 
 ```
+
+you can also override parameters like so
+```
+python main.py --config configs/Waterbirds/mlp.yaml METHOD.MODEL.LR=0.1 EXP.PROJ=new_project
+```
+
+### Datasets
 
 Datasets supported are in the [helpers folder](./helpers/data_helpers.py). Currently they are:
 * Waterbirds (100% and 95%) [our specific split](https://drive.google.com/file/d/1zJpQYGEt1SuwitlNfE06TFyLaWX-st1k/view) [code to generate data](https://github.com/kohpangwei/group_DRO)
-* ColoredMNIST (LNTL version and simplified version) NOTEBOOK COMING SOON
+* ColoredMNIST [Red/Blue color](https://drive.google.com/file/d/1GomKfufFrXIRAFJNedUBCDwHW2X9NTP-/view?usp=share_link) NOTEBOOK COMING SOON 
 * DomainNet (the version used in the paper is `DATA.DATASET=DomainNetMini`) [full dataset](http://ai.bu.edu/DomainNet/)
 * CUB Paintings [photos dataset](https://www.vision.caltech.edu/datasets/cub_200_2011/) [paintings dataset](https://github.com/thuml/PAN)
 * OfficeHome COMING SOON
 
 You can download the CLIP embeddings of these datasets [here](https://drive.google.com/drive/folders/1ItjhX7RPfQ6fQQk6_bEYJPewnkVdcfOC?usp=sharing). We also have the embeddings for CUB, Waterbirds, and DomainNetMini in the [embeddings](./embeddings/) folder.
 
-Since computing the CLIP embeddings for each train/val/test set is time consuming, you can store the embeddings by setting `DATA.LOAD_CACHED=False` and `DATA.SAVE_PATH=[path you want to save to]`
+Since computing the CLIP embeddings for each train/val/test set is time consuming, you can store the embeddings by setting `DATA.LOAD_CACHED=False`, then it should store the embeddings into a file `embeddings/{dataset}/clip_{openai,LAION}_{model_name}`
 
-Then, add the path to the saved embeddings to DATASET_PATHS in [data_helpers](./helpers/data_helpers.py) and set `DATA.LOAD_CACHED=Tue` in your yaml file
+### Methods
+
+All the augmenation methods (i.e. LADS and BiasLADS) are in `methods/augmentations`, while the classifiers and baselines are in `methods/clip_transformations.py`
 
 More description of each method and the config files in the config folder. 
 
@@ -49,11 +69,11 @@ and check your results with https://wandb.ai/clipinvariance/LADS_CUBPainting_Rep
 For the bias datasets, the augmentation class is called `BiasLADS`, and you can run the `lads.yaml` configs as well :)
 
 ## Running CLIP Zero-Shot
-In order to run the CLIP zero-shot baseline, set `EXP.ADVICE_METHOD=CLIPZS` and run the `clip_zs.py` file instead of `main.py` file. 
+In order to run the CLIP zero-shot baseline, set `EXP.ADVICE_METHOD=CLIPZS`. 
 
 For example
 ```
-python clip_zs.py --config configs/Waterbirds/ZS.yaml
+python main.py --config configs/Waterbirds/ZS.yaml
 ```
 
 CLIP text templates are located in `helpers/text_templates.py`, and you can specify which template you want with the `EXP.TEMPLATES` parameter. 
@@ -89,8 +109,6 @@ If you want to take the difference in text embeddings (for things like the direc
 <details><summary>EXP.ADVICE_METHOD</summary>
 
 This sets the type of linear probing you are doing. Set to `LR` if you want to use the scikit learn LR (what is in the CLIP repo) or `ClipMLP` for pytorch MLP (if `METHOD.MODEL.NUM_LAYERS=1` this is LR). Typically `CLIPMLP` runs a lot faster than `LR`.
-
-You can also set the advice method to one of the debiasing methods (different from augmentations in that we augment the training data and dont add in the original training data), but we don't use them anymore and I'm too lazy to explain it so if you care to try them out check the configs file (WARNING these are old so high chance of bugs).
 </details>
 
 

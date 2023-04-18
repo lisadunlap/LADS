@@ -4,8 +4,8 @@ EXP:
   PROJ: "LADS_Waterbirds_Rebuttal"
   SEED: 0
   TEXT_PROMPTS: [['a photo of a {} on forest.'], ['a photo of a {} on water.']]
-  NEUTRAL_TEXT_PROMPTS: []
-  AUGMENTATION: 'BiasDirectional'
+  NEUTRAL_TEXT_PROMPTS: ['a photo of a {} on forest.', 'a photo of a {} on water.']
+  AUGMENTATION: 'LADSBias'
   EPOCHS: 200
   CHECKPOINT_VAL: True
   ENSAMBLE: False
@@ -15,17 +15,16 @@ DATA:
   DATASET: "Waterbirds"
   LOAD_CACHED: True
   BATCH_SIZE: 256
+  ROOT: /shared/lisabdunlap/vl-attention/data
 
 METHOD:
   MODEL:
     NUM_LAYERS: 1
     DOM_WEIGHT: 1.0
     LR: 0.001
-    WEIGHT_DECAY: 0.05
-    CHECKPOINT: 'checkpoint/mlp_simple.pth'
-    CHECKPOINT_NAME: 'mlp-directional'
+    CHECKPOINT: 'checkpoint/mlp.pth'
+    CHECKPOINT_NAME: "mlp"
     RESUME: False
-  # USE_DOM_GT: True
 
 AUGMENTATION:
   MODEL:
@@ -36,10 +35,7 @@ AUGMENTATION:
   EPOCHS: 50
   GENERIC: False
   DOM_LABELS: ["forest", "water"]
-  DOM_SPECIFIC_XE: False
+  DOM_SPECIFIC_XE: True
   ALPHA: 0.75
-  CLIP_NN_LOSS: True
   COMPARE_BEFORE_AUG: True
   NN_INCLUDE_SAMPLE: True
-  DOM_WEIGHT: 1.0
-  NN_WEIGHT: 1.0

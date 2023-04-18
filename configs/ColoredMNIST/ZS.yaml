@@ -1,16 +1,16 @@
 EXP:
   ADVICE_METHOD: "CLIPZS"
   WANDB_SILENT: False
-  PROJ: "ColoredMNIST_ViT_Final"
+  PROJ: "ColoredMNIST"
   SEED: 0
   TEXT_PROMPTS: ['0','1','2','3','4','5','6','7','8','9']
   TEMPLATES: 'color_mnist_templates'
-  # TEMPLATES: 'no_template'
   
 DATA:
   DATASET: "ColoredMNISTBinary"
   LOAD_CACHED: True
   BATCH_SIZE: 256
+  ROOT: './data'
 
 METHOD:
   MODEL:

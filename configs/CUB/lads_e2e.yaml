@@ -1,0 +1,45 @@
+EXP:
+  ADVICE_METHOD: "AugE2EMLPMulti"
+  WANDB_SILENT: False
+  PROJ: "CUB_Painting_E2E"
+  SEED: 0
+  TEXT_PROMPTS: [['a painting of a {} bird.'], ['art of a {} bird.'], ['a drawing of a {} bird.']]
+  NEUTRAL_TEXT_PROMPTS: ['a photo of a {} bird.']
+  EPOCHS: 200
+  LOG_HIST: False
+  ENSAMBLE: False
+  LOG_NN: False
+  
+  
+DATA:
+  DATASET: "CUB"
+  LOAD_CACHED: True
+  BATCH_SIZE: 256
+
+METHOD:
+  MODEL:
+    NUM_LAYERS: 2
+    DOM_WEIGHT: 1.0
+    LR: 0.001
+    WEIGHT_DECAY: 0.05
+    CHECKPOINT: 'checkpoint/mlp_simple.pth'
+    CHECKPOINT_NAME: 'CUB'
+    RESUME: False
+  USE_DOM_GT: True
+
+AUGMENTATION:
+  MODEL:
+    LR: 0.01
+    WEIGHT_DECAY: 0.05
+    NUM_LAYERS: 2
+  LOSS_TYPE: 'cosine'
+  SQUARE_LOSS: False
+  DOM_WEIGHT: 2
+  ALPHA: 0.5
+  GENERIC: False
+  DOM_LABELS: ['painting']
+  RANDOMIZE_PROB: 1.0
+  RANDOMIZE: False
+  REG_WEIGHT: 0.0
+  CC_WEIGHT: 1.0
+  CYCLE_GAN_WEIGHT: 0.0

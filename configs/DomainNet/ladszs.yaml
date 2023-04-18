@@ -1,0 +1,41 @@
+EXP:
+  ADVICE_METHOD: "ClipMLP"
+  WANDB_SILENT: False
+  PROJ: "DomainNetMini_LADS_Replication"
+  SEED: 0
+  TEXT_PROMPTS: [['a realistic photo of a {}'], ['a painting of a {}'], ['clipart of a {}']]
+  NEUTRAL_TEXT_PROMPTS: ['a sketch of a {}']
+  # TEXT_PROMPTS: [ 'a realistic photo of a {}.', 'a painting of a {}.', 'clipart of a {}.']
+  # NEUTRAL_TEXT_PROMPTS: ['a sketch of a {}', 'a pencil drawing of a {}.', 'a drawing of a {}.'] # you can also just use one prompt
+  # AUGMENTATION: 'LADS'
+  AUGMENTATION: Directional
+  TEMPLATES: 'domainnet_mini_templates'
+  EPOCHS: 400
+  ENSAMBLE: False
+  LOG_NN: True
+  
+  
+DATA:
+  DATASET: "DomainNetMini"
+  LOAD_CACHED: True
+  BATCH_SIZE: 256
+
+METHOD:
+  MODEL:
+    NUM_LAYERS: 1
+    DOM_WEIGHT: 1.0
+    LR: 0.0001
+    CHECKPOINT: 'checkpoint/mlp_simple.pth'
+    CHECKPOINT_NAME: 'DomainNetMini-mlp-directional'
+    RESUME: False
+  USE_DOM_GT: True
+
+AUGMENTATION:
+  MODEL:
+    LR: 0.0001
+    WEIGHT_DECAY: 0.005
+    NUM_LAYERS: 1
+  EPOCHS: 50
+  GENERIC: False
+  ALPHA: 0.5
+  DOM_LABELS: ['real', 'painting', 'clipart']

@@ -26,69 +26,8 @@ import helpers
 
 import omegaconf
 
-def get_domain_text_embs(model, cfg, source_text_prompts, target_text_prompts, class_names):
-    """
-    Gets the text embeddings of the prompts describing the source and target domains. 
-    If generic is True, source_text_prompts and target_text_prompts are strings instead of 
-    templates to put the class name in. 
-    """
-    if cfg.AUGMENTATION.GENERIC:
-        text_embeddings = zeroshot_classifier(target_text_prompts, model, normalize=cfg.METHOD.NORMALIZE, model_type=cfg.EXP.IMAGE_FEATURES)
-        text_embeddings = np.transpose(text_embeddings, (1,0))
-        orig_prompts = text_embeddings
-        if len(source_text_prompts) > 0:
-            source_embeddings = zeroshot_classifier(source_text_prompts, model, normalize=cfg.METHOD.NORMALIZE, model_type=cfg.EXP.IMAGE_FEATURES)
-            print("source emb before averaging", source_embeddings.shape)
-            source_embeddings = source_embeddings.mean(dim=0)
-            print("source emb after averaging", source_embeddings.shape)
-            diffs = torch.stack([emb-source_embeddings[0] for emb in text_embeddings])
-            diffs /= text_embeddings.norm(dim=-1, keepdim=True)
-    else:
-        print(target_text_prompts)
-        # print("yo", len(source_text_prompts), len(source_text_prompts[0]))
-        # go on a per class basis
-        templates = target_text_prompts
-        all_texts = []
-        for t in source_text_prompts:
-            texts = [[t.format(c)] for c in class_names]
-            text_emb = zeroshot_classifier(texts, model, normalize=cfg.METHOD.NORMALIZE, model_type=cfg.EXP.IMAGE_FEATURES).T
-            print(texts, "text_emb", text_emb.shape)
-            all_texts.append(text_emb)
-        if type(target_text_prompts[0]) == str:
-            target_text_prompts = [target_text_prompts]
-        print(target_text_prompts)
-        for p in target_text_prompts:
-            print(p)
-            texts = [[t.format(c) for t in p] for c in class_names]
-            text_emb = zeroshot_classifier(texts, model, normalize=cfg.METHOD.NORMALIZE, model_type=cfg.EXP.IMAGE_FEATURES).T
-            all_texts.append(text_emb)
-        # this subtracts the neutral embedding from the domain embeddings and normalizes. 
-        text_pairs = torch.stack(all_texts)
-        print("text pairs", text_pairs.shape)
-        target_embeddings, source_embeddings = text_pairs, []
-        if len(source_text_prompts) > 0:
-            source_embeddings = text_pairs[:len(source_text_prompts)]
-            target_embeddings = text_pairs[len(source_text_prompts):]
-        else:
-            source_embeddings = torch.zeros_like(target_embeddings)
-        #     text_diffs = []
-        #     source_domain = text_pairs[0]
-        #     for target_domain in text_pairs[1:]:
-        #         diff = target_domain - source_domain
-        #         diff /= np.linalg.norm(diff, axis=-1, keepdims=True)
-        #         # diff = np.expand_dims(diff, axis=0)
-        #         text_diffs.append(diff)
-        # else:
-        #     target_embeddings = text_pairs
-        #     text_diffs = text_pairs
-        # diffs = torch.stack(text_diffs).permute(1,0,2) # should be (num_classes, num_domains, emb_size)
-        # print("diffs shape", diffs.shape)
-        # print("source embeddings", source_embeddings.shape)
-        print("target embeddings", target_embeddings.shape)
-    return source_embeddings, target_embeddings
-
 def get_features(dataset, model, device, model_type):
-    if model_type != 'clip' and model_type != 'openclip':
+    if model_type != 'clip':
         return get_resnet_features(dataset, model, device)
     model.eval()
     all_features = []
@@ -98,6 +37,7 @@ def get_features(dataset, model, device, model_type):
     
     with torch.no_grad():
         for batch in tqdm(dataset):
+            # print(batch['image'], batch['label'], batch['group'], batch['domain'], batch['filename'])
             images, labels, groups, domains, filenames = batch['image'], batch['label'], batch['group'], batch['domain'], batch['filename']
             features = model.encode_image(images.to(device))
 
@@ -137,6 +77,16 @@ def get_resnet_features(dataset, model, device):
     print(torch.cat(all_features).cpu().numpy().shape)
 
     return torch.cat(all_features).cpu().numpy(), torch.cat(all_labels).cpu().numpy(), torch.cat(all_groups).cpu().numpy(), torch.cat(all_domains).cpu().numpy()
+
+def load_embeddings(cache_file, dataset):
+    """
+    Loads the embeddings from a file
+    """
+    save_dict = torch.load(cache_file)
+    train_features, train_labels, train_groups, train_domains, train_filenames = save_dict['train_features'], save_dict['train_labels'], save_dict['train_groups'], save_dict['train_domains'], save_dict['train_filenames']
+    val_features, val_labels, val_groups, val_domains, val_filenames = save_dict['val_features'], save_dict['val_labels'], save_dict['val_groups'], save_dict['val_domains'], save_dict['val_filenames']
+    test_features, test_labels, test_groups, test_domains, test_filenames = save_dict['test_features'], save_dict['test_labels'], save_dict['test_groups'], save_dict['test_domains'], save_dict['test_filenames']
+    return train_features, train_labels, train_groups, train_domains, train_filenames, val_features, val_labels, val_groups, val_domains, val_filenames, test_features, test_labels, test_groups, test_domains, test_filenames
 
 def projection(u, v):
     return (v * u).sum() / (u * u).sum() * u
@@ -227,8 +177,8 @@ def get_ensamble_preds(val_features, probs, zeroshot_weights, dataset_domains=No
     except:
         outputs = probs
     print(outputs.shape)
-    salem_preds = np.argmax(outputs, axis=1)
-    print(salem_preds.shape)
+    lads_preds = np.argmax(outputs, axis=1)
+    print(lads_preds.shape)
     # CLIP ZS
     zeroshot_weights = zeroshot_weights.cuda()
     images = torch.tensor(val_features).cuda()
@@ -246,27 +196,27 @@ def get_ensamble_preds(val_features, probs, zeroshot_weights, dataset_domains=No
         dom_preds  = []
         for i in range(len(ensambled_preds)):
             if soft_dom_label[i] == 0:
-                dom_preds.append(salem_preds[i])
+                dom_preds.append(lads_preds[i])
             else:
                 dom_preds.append(ensambled_preds[i])
         ret_preds = np.array(dom_preds)
     else:
         ret_preds = ensambled_preds
 
-    return salem_preds, zs_preds, ensambled_preds, ret_preds
+    return lads_preds, zs_preds, ensambled_preds, ret_preds
 
-def get_pred_overlap(salem_preds, zs_preds, labels):
+def get_pred_overlap(lads_preds, zs_preds, labels):
     """
-    Get the overlap in correct predictions for salem and zeroshot.
+    Get the overlap in correct predictions for lads and zeroshot.
     """
-    salem_correct = np.where(salem_preds == labels)[0]
+    lads_correct = np.where(lads_preds == labels)[0]
     zs_correct = np.where(zs_preds == labels)[0]
-    print(len(salem_correct), len(zs_correct))
-    print("salem correct ", salem_correct[:10])
+    print(len(lads_correct), len(zs_correct))
+    print("lads correct ", lads_correct[:10])
     print("zs correct ", zs_correct[:10])
-    salem_overlap = [i for i in salem_correct if i in zs_correct]
-    salem_nonverlap = [i for i in salem_correct if not (i in zs_correct)]
-    zs_nonverlap = [i for i in zs_correct if not (i in salem_correct)]
-    num_zs_correct_nonoverlap = len(zs_correct) - len(salem_overlap)
-    num_salem_correct_nonverlap = len(salem_correct) - len(salem_overlap)
-    return num_salem_correct_nonverlap, num_salem_correct_nonverlap/len(labels), num_salem_correct_nonverlap/len(salem_correct)
+    lads_overlap = [i for i in lads_correct if i in zs_correct]
+    lads_nonverlap = [i for i in lads_correct if not (i in zs_correct)]
+    zs_nonverlap = [i for i in zs_correct if not (i in lads_correct)]
+    num_zs_correct_nonoverlap = len(zs_correct) - len(lads_overlap)
+    num_lads_correct_nonverlap = len(lads_correct) - len(lads_overlap)
+    return num_lads_correct_nonverlap, num_lads_correct_nonverlap/len(labels), num_lads_correct_nonverlap/len(lads_correct)

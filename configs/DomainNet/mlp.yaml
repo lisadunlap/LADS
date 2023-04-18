@@ -4,6 +4,7 @@ EXP:
   PROJ: "DomainNetMini_LADS_Replication"
   SEED: 0
   TEXT_PROMPTS: ['clipart of a {}.', 'a painting of a {}.', 'a realistic photo of a {}.']
+  NEUTRAL_TEXT_PROMPTS: ['a sketch of a {}']
   EPOCHS: 400
 
 DATA:

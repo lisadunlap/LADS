@@ -4,8 +4,11 @@ EXP:
   PROJ: "DomainNetMini_LADS_Replication"
   SEED: 0
   TEXT_PROMPTS: [['a realistic photo of a {}'], ['a painting of a {}'], ['clipart of a {}']]
-  NEUTRAL_TEXT_PROMPTS: ['a sketch of a {}', 'a pencil drawing of a {}.', 'a drawing of a {}.'] # you can also just use one prompt
-  AUGMENTATION: 'LADS'
+  NEUTRAL_TEXT_PROMPTS: ['a sketch of a {}']
+  # TEXT_PROMPTS: [ 'a realistic photo of a {}.', 'a painting of a {}.', 'clipart of a {}.']
+  # NEUTRAL_TEXT_PROMPTS: ['a sketch of a {}', 'a pencil drawing of a {}.', 'a drawing of a {}.'] # you can also just use one prompt
+  # AUGMENTATION: 'LADS'
+  AUGMENTATION: LADS
   EPOCHS: 400
   ENSAMBLE: False
   LOG_NN: True
@@ -14,7 +17,6 @@ EXP:
 DATA:
   DATASET: "DomainNetMini"
   LOAD_CACHED: True
-  SAVE_PATH: "vit14_clip.pth"
   BATCH_SIZE: 256
 
 METHOD:
@@ -35,4 +37,5 @@ AUGMENTATION:
   EPOCHS: 50
   GENERIC: False
   ALPHA: 0.5
-  DOM_LABELS: ['real', 'painting', 'clipart']
+  # DOM_LABELS: ['real', 'painting', 'clipart']
+  DOM_LABELS: ['clipart', 'painting', 'real', 'sketch']

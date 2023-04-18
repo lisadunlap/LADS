@@ -41,7 +41,7 @@ colors = {0: 'red', 1: 'green', 2: 'yellow', 3: 'pink', 4: 'blue'}
 
 class MNIST:
 
-    def __init__(self, root, cfg, split='train', transform=None, biased_val=False):
+    def __init__(self, root, cfg, split='train', transform=None):
         random.seed(0)
         self.dataset = torchvision.datasets.MNIST(root, download=True, train=split=='train')
         self.random_idxs = random.sample(range(len(self.dataset)), int(len(self.dataset)*0.1))
@@ -88,7 +88,7 @@ class MNIST:
 
 class SVHN:
 
-    def __init__(self, root, cfg, split='train', transform=None, biased_val=False):
+    def __init__(self, root, cfg, split='train', transform=None):
         self.dataset = torchvision.datasets.SVHN(root, download=True, split='train' if split == 'train' else 'test')
         self.random_idxs = random.sample(range(len(self.dataset)), int(len(self.dataset)*0.1))
         self.root = root
@@ -129,7 +129,7 @@ class SVHN:
 
 class ColoredMNISTSimplified:
 
-    def __init__(self, root, cfg, split='train', transform=None, biased_val=False):
+    def __init__(self, root, cfg, split='train', transform=None):
         self.root = root
         self.split = split
         self.transform = transform
@@ -139,13 +139,6 @@ class ColoredMNISTSimplified:
                 self.data = np.load(f'{root}/ColoredMNIST/{split}_{self.cfg.DATA.BIAS_TYPE}_100.npy', allow_pickle=True).item()
             except:
                 self.data = np.load(f'{root}/ColoredMNIST/{split}_{self.cfg.DATA.BIAS_TYPE}_biased.npy', allow_pickle=True).item()
-        elif cfg.DATA.CONFOUNDING == 0.95 and self.split == 'train':
-            self.data = np.load(f'{root}/ColoredMNIST/{split}_{self.cfg.DATA.BIAS_TYPE}_95.npy', allow_pickle=True).item()
-        else:
-            if split == 'val' and biased_val:
-                self.data = np.load(f'{root}/ColoredMNIST/{split}_{self.cfg.DATA.BIAS_TYPE}_biased.npy', allow_pickle=True).item()
-            else:
-                self.data = np.load(f'{root}/ColoredMNIST/{split}_{self.cfg.DATA.BIAS_TYPE}.npy', allow_pickle=True).item()
         self.imgs = self.data['images']
         self.labels = self.data['labels']
         self.domains = self.data['colors']
@@ -208,7 +201,7 @@ class ColoredMNISTSimplified:
 
 class ColoredMNIST(Dataset):
 
-    def __init__(self, root, cfg, split='train', transform=None, biased_val=False):
+    def __init__(self, root, cfg, split='train', transform=None):
         self.data_split = split
         data_dic = np.load(os.path.join(root,'mnist_10color_jitter_var_%.03f.npy'%cfg.DATA.COLOR_VAR),encoding='latin1', allow_pickle=True).item()
         if self.data_split == 'train':
@@ -216,18 +209,12 @@ class ColoredMNIST(Dataset):
             self.label = np.array([lab for i, lab in enumerate(data_dic['train_label']) if i % 6 != 0])
 
         if self.data_split == 'test':
-            # self.image = np.array([img for i, img in enumerate(data_dic['test_image']) if i % 2 == 0])
-            # self.label = np.array([lab for i, lab in enumerate(data_dic['test_label']) if i % 2 == 0])
             self.image = np.array(data_dic['test_image'])
             self.label = np.array(data_dic['test_label'])
 
         if self.data_split =='val':
-            if biased_val: # take from train set
-                self.image = np.array([img for i, img in enumerate(data_dic['train_image']) if i % 6 == 0])
-                self.label = np.array([lab for i, lab in enumerate(data_dic['train_label']) if i % 6 == 0])
-            else: # take from test set
-                self.image = np.array([img for i, img in enumerate(data_dic['test_image']) if i % 2 == 1])
-                self.label = np.array([lab for i, lab in enumerate(data_dic['test_label']) if i % 2 == 1])  
+            self.image = np.array([img for i, img in enumerate(data_dic['train_image']) if i % 6 == 0])
+            self.label = np.array([lab for i, lab in enumerate(data_dic['train_label']) if i % 6 == 0]) 
 
         self.class_weights = get_counts(self.label)
         self.transform = transform

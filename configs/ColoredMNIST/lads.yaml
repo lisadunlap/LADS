@@ -1,22 +1,20 @@
 EXP:
   ADVICE_METHOD: "ClipMLP"
   WANDB_SILENT: False
-  PROJ: "ColoredMNIST_ViT_Final"
+  PROJ: "ColoredMNIST"
   SEED: 0
+  AUGMENTATION: 'LADSBias'
   TEXT_PROMPTS: [['a photo of a red number {}.'], ['a photo of a blue number {}.']]
-  AUGMENTATION: 'BiasDirectional'
+  NEUTRAL_TEXT_PROMPTS: ['a photo of a red number {}.', 'a photo of a blue number {}.']
   EPOCHS: 200
   CHECKPOINT_VAL: True
   ENSAMBLE: False
-
-  # CLIP_MODEL: 'ViT-H-14'
-  # CLIP_PRETRAINED_DATASET: 'laion2b_s32b_b79k'
-  # IMAGE_FEATURES: 'openclip'
 
 DATA:
   DATASET: "ColoredMNISTBinary"
   LOAD_CACHED: True
   BATCH_SIZE: 256
+  ROOT: './data'
 
 METHOD:
   MODEL:

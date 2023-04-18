@@ -92,7 +92,7 @@ if os.path.exists(cache_file):
     train_features, train_labels, train_groups, train_domains, train_filenames, val_features, val_labels, val_groups, val_domains, val_filenames, test_features, test_labels, test_groups, test_domains, test_filenames = load_embeddings(cache_file, args.DATA.DATASET)
 else:
     print(f"Computing embeddings and saving to {cache_file}")
-    trainset, valset, testset = dh.get_dataset(DATASET_NAME, preprocess)
+    trainset, valset, testset = dh.get_dataset(DATASET_NAME, cfg.DATA.ROOT, preprocess)
     dataset_classes, dataset_domains = dh.get_class(DATASET_NAME), dh.get_domain(DATASET_NAME)
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=cfg.DATA.BATCH_SIZE, shuffle=True)
     val_loader = torch.utils.data.DataLoader(valset, batch_size=cfg.DATA.BATCH_SIZE, shuffle=False)

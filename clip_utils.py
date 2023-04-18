@@ -177,8 +177,8 @@ def get_ensamble_preds(val_features, probs, zeroshot_weights, dataset_domains=No
     except:
         outputs = probs
     print(outputs.shape)
-    salem_preds = np.argmax(outputs, axis=1)
-    print(salem_preds.shape)
+    lads_preds = np.argmax(outputs, axis=1)
+    print(lads_preds.shape)
     # CLIP ZS
     zeroshot_weights = zeroshot_weights.cuda()
     images = torch.tensor(val_features).cuda()
@@ -196,27 +196,27 @@ def get_ensamble_preds(val_features, probs, zeroshot_weights, dataset_domains=No
         dom_preds  = []
         for i in range(len(ensambled_preds)):
             if soft_dom_label[i] == 0:
-                dom_preds.append(salem_preds[i])
+                dom_preds.append(lads_preds[i])
             else:
                 dom_preds.append(ensambled_preds[i])
         ret_preds = np.array(dom_preds)
     else:
         ret_preds = ensambled_preds
 
-    return salem_preds, zs_preds, ensambled_preds, ret_preds
+    return lads_preds, zs_preds, ensambled_preds, ret_preds
 
-def get_pred_overlap(salem_preds, zs_preds, labels):
+def get_pred_overlap(lads_preds, zs_preds, labels):
     """
-    Get the overlap in correct predictions for salem and zeroshot.
+    Get the overlap in correct predictions for lads and zeroshot.
     """
-    salem_correct = np.where(salem_preds == labels)[0]
+    lads_correct = np.where(lads_preds == labels)[0]
     zs_correct = np.where(zs_preds == labels)[0]
-    print(len(salem_correct), len(zs_correct))
-    print("salem correct ", salem_correct[:10])
+    print(len(lads_correct), len(zs_correct))
+    print("lads correct ", lads_correct[:10])
     print("zs correct ", zs_correct[:10])
-    salem_overlap = [i for i in salem_correct if i in zs_correct]
-    salem_nonverlap = [i for i in salem_correct if not (i in zs_correct)]
-    zs_nonverlap = [i for i in zs_correct if not (i in salem_correct)]
-    num_zs_correct_nonoverlap = len(zs_correct) - len(salem_overlap)
-    num_salem_correct_nonverlap = len(salem_correct) - len(salem_overlap)
-    return num_salem_correct_nonverlap, num_salem_correct_nonverlap/len(labels), num_salem_correct_nonverlap/len(salem_correct)
+    lads_overlap = [i for i in lads_correct if i in zs_correct]
+    lads_nonverlap = [i for i in lads_correct if not (i in zs_correct)]
+    zs_nonverlap = [i for i in zs_correct if not (i in lads_correct)]
+    num_zs_correct_nonoverlap = len(zs_correct) - len(lads_overlap)
+    num_lads_correct_nonverlap = len(lads_correct) - len(lads_overlap)
+    return num_lads_correct_nonverlap, num_lads_correct_nonverlap/len(labels), num_lads_correct_nonverlap/len(lads_correct)

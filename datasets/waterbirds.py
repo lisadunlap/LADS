@@ -14,7 +14,7 @@ def get_label_mapping():
     return np.array(['Landbird', 'Waterbird'])
 
 class WaterbirdsOrig(torch.utils.data.Dataset):
-    def __init__(self, root, cfg, split='train', transform=None, biased_val=False):
+    def __init__(self, root, cfg, split='train', transform=None):
         self.cfg = cfg
         # self.original_root       = os.path.expanduser(root)
         self.original_root = root
@@ -81,8 +81,8 @@ class WaterbirdsOrig(torch.utils.data.Dataset):
         self.group_labels_split  = []
         self.confounder_split    = []
         for idx in self.indices:
-            if biased_val and split == 'val':
-                if self.group_array[idx].item() in [0, 3]:
+            if split == 'val':
+                if self.group_array[idx].item() in [0, 3]: # only put biased data in the val set
                     self.image_filenames.append(self.data[idx])
                     self.labels_split.append(self.labels[idx])
                     self.group_labels_split.append(self.group_array[idx])

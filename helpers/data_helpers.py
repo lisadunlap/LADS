@@ -64,78 +64,74 @@ def get_transform(dataset_name="Imagenet", model=None):
     
     return train_transform, transform
 
-def get_dataset(dataset_name, transform, val_transform=None, biased_val=True):
+def get_dataset(dataset_name, root, transform, val_transform=None):
     if val_transform == None:
         val_transform = transform
     if dataset_name == 'Waterbirds':
         args = get_config('Waterbirds')
-        trainset = WaterbirdsOrig('/shared/lisabdunlap/vl-attention/data', args, transform=transform, biased_val=biased_val)
-        valset = WaterbirdsOrig('/shared/lisabdunlap/vl-attention/data', args, split='val', transform=val_transform, biased_val=biased_val)
-        testset = WaterbirdsOrig('/shared/lisabdunlap/vl-attention/data', args, split='test', transform=val_transform, biased_val=biased_val)
+        trainset = WaterbirdsOrig(root, args, transform=transform)
+        valset = WaterbirdsOrig(root, args, split='val', transform=val_transform)
+        testset = WaterbirdsOrig(root, args, split='test', transform=val_transform)
     elif dataset_name == 'Waterbirds95':
         args = get_config('Waterbirds95')
-        trainset = WaterbirdsOrig('/shared/lisabdunlap/vl-attention/data', args, transform=transform, biased_val=biased_val)
-        valset = WaterbirdsOrig('/shared/lisabdunlap/vl-attention/data', args, split='val', transform=val_transform, biased_val=biased_val)
-        testset = WaterbirdsOrig('/shared/lisabdunlap/vl-attention/data', args, split='test', transform=val_transform, biased_val=biased_val)
+        trainset = WaterbirdsOrig(root, args, transform=transform)
+        valset = WaterbirdsOrig(root, args, split='val', transform=val_transform)
+        testset = WaterbirdsOrig(root, args, split='test', transform=val_transform)
     elif dataset_name == 'ColoredMNISTBinary':
         args = get_config('ColoredMNIST')
         args.DATA.CONFOUNDING = 1.0
         args.DATA.BIAS_TYPE = 'bin_blue'
-        trainset = ColoredMNISTSimplified('./data', args, transform=transform, biased_val=biased_val)
-        valset = ColoredMNISTSimplified('./data', args, split='val', transform=val_transform, biased_val=biased_val)
-        testset = ColoredMNISTSimplified('./data', args, split='test', transform=val_transform, biased_val=biased_val)
+        trainset = ColoredMNISTSimplified('./data', args, transform=transform)
+        valset = ColoredMNISTSimplified('./data', args, split='val', transform=val_transform)
+        testset = ColoredMNISTSimplified('./data', args, split='test', transform=val_transform)
     elif dataset_name == 'MNIST':
         args = None
-        trainset = MNIST('./data', args, transform=transform, biased_val=biased_val)
-        valset = MNIST('./data', args, split='val', transform=val_transform, biased_val=biased_val)
-        testset = MNIST('./data', args, split='test', transform=val_transform, biased_val=biased_val)
+        trainset = MNIST('./data', args, transform=transform)
+        valset = MNIST('./data', args, split='val', transform=val_transform)
+        testset = MNIST('./data', args, split='test', transform=val_transform)
     elif dataset_name == 'SVHN':
         args = None
-        trainset = SVHN('./data', args, transform=transform, biased_val=biased_val)
-        valset = SVHN('./data', args, split='val', transform=val_transform, biased_val=biased_val)
-        testset = SVHN('./data', args, split='test', transform=val_transform, biased_val=biased_val)
+        trainset = SVHN('./data', args, transform=transform)
+        valset = SVHN('./data', args, split='val', transform=val_transform)
+        testset = SVHN('./data', args, split='test', transform=val_transform)
     elif dataset_name == 'MNIST_SVHN':
         args = None
-        trainset = MNIST('./data', args, transform=transform, biased_val=biased_val)
-        valset = MNIST('./data', args, split='test', transform=val_transform, biased_val=biased_val)
-        testset = SVHN('./data', args, split='test', transform=val_transform, biased_val=biased_val)
+        trainset = MNIST('./data', args, transform=transform)
+        valset = MNIST('./data', args, split='test', transform=val_transform)
+        testset = SVHN('./data', args, split='test', transform=val_transform)
     elif dataset_name == "DomainNet":
         cfg = get_config('DomainNet')
-        trainset = DomainNet('/shared/lisabdunlap/data', cfg, split='train', transform=transform)
-        valset = DomainNet('/shared/lisabdunlap/data', cfg, split='val', transform=val_transform)
-        testset = DomainNet('/shared/lisabdunlap/data', cfg, split='test', transform=val_transform)
+        trainset = DomainNet(root, cfg, split='train', transform=transform)
+        valset = DomainNet(root, cfg, split='val', transform=val_transform)
+        testset = DomainNet(root, cfg, split='test', transform=val_transform)
     elif dataset_name == "DomainNetMini":
-        trainset = OneDomain('/shared/lisabdunlap/data', domain='sketch', split='train', transform=transform)
-        valset = OneDomain('/shared/lisabdunlap/data', domain='sketch', split='val', transform=val_transform)
-        testset = MultiDomain('/shared/lisabdunlap/data', domains=['clipart', 'painting', 'real'], split='test', transform=val_transform)
+        trainset = OneDomain(root, domain='sketch', split='train', transform=transform)
+        valset = OneDomain(root, domain='sketch', split='val', transform=val_transform)
+        testset = MultiDomain(root, domains=['clipart', 'painting', 'real'], split='test', transform=val_transform)
     elif dataset_name == "DomainNetMiniReal":
-        trainset = OneDomain('/shared/lisabdunlap/data', domain='real', split='train', transform=transform)
-        valset = OneDomain('/shared/lisabdunlap/data', domain='real', split='val', transform=val_transform)
-        testset = MultiDomain('/shared/lisabdunlap/data', domains=['clipart', 'painting', 'sketch'], split='test', transform=val_transform)
-    elif dataset_name == "DomainNetMiniAug":
-        trainset = DomainNetMiniAug('/shared/lisabdunlap/data/domainnet_aug', domain='sketch', split='train', transform=transform)
-        valset = OneDomain('/shared/lisabdunlap/data', domain='sketch', split='val', transform=val_transform)
-        testset = MultiDomain('/shared/lisabdunlap/data', domains=['clipart', 'painting', 'real'], split='test', transform=val_transform)
+        trainset = OneDomain(root, domain='real', split='train', transform=transform)
+        valset = OneDomain(root, domain='real', split='val', transform=val_transform)
+        testset = MultiDomain(root, domains=['clipart', 'painting', 'sketch'], split='test', transform=val_transform)
     elif dataset_name == "DomainNetMiniOracle":
-        trainset = MultiDomain('/shared/lisabdunlap/data', domains=['sketch', 'clipart', 'painting', 'real'], split='train', transform=transform)
-        valset = MultiDomain('/shared/lisabdunlap/data', domains=['sketch', 'clipart', 'painting', 'real'], split='val', transform=val_transform)
-        testset = MultiDomain('/shared/lisabdunlap/data', domains=['sketch', 'clipart', 'painting', 'real'], split='test', transform=val_transform)
+        trainset = MultiDomain(root, domains=['sketch', 'clipart', 'painting', 'real'], split='train', transform=transform)
+        valset = MultiDomain(root, domains=['sketch', 'clipart', 'painting', 'real'], split='val', transform=val_transform)
+        testset = MultiDomain(root, domains=['sketch', 'clipart', 'painting', 'real'], split='test', transform=val_transform)
     elif dataset_name == "CUB":
-        trainset = Cub2011('/shared/lisabdunlap/data', train=True, transform=transform)
-        valset = Cub2011('/shared/lisabdunlap/data', train=False, transform=val_transform)
+        trainset = Cub2011(root, train=True, transform=transform)
+        valset = Cub2011(root, train=False, transform=val_transform)
         testset = Cub2011Painting('/shared/lisabdunlap/data/CUB-200-Painting', transform=val_transform)
     elif dataset_name == "OfficeHomeProduct":
-        trainset = OfficeHome('/shared/lisabdunlap/data', domains=["Product"], train=True, transform=transform)
-        valset = OfficeHome('/shared/lisabdunlap/data', domains=["Product"], train=False, transform=transform)
-        testset = OfficeHome('/shared/lisabdunlap/data', domains=["Art", "Clipart", "Real World"],train=True, transform=transform)
+        trainset = OfficeHome(root, domains=["Product"], train=True, transform=transform)
+        valset = OfficeHome(root, domains=["Product"], train=False, transform=transform)
+        testset = OfficeHome(root, domains=["Art", "Clipart", "Real World"],train=True, transform=transform)
     elif dataset_name == "OfficeHomeClipart":
-        trainset = OfficeHome('/shared/lisabdunlap/data', domains=["Clipart"], train=True, transform=transform)
-        valset = OfficeHome('/shared/lisabdunlap/data', domains=["Clipart"], train=False, transform=transform)
-        testset = OfficeHome('/shared/lisabdunlap/data', domains=["Product", "Art", "Real World"],train=True, transform=transform)
+        trainset = OfficeHome(root, domains=["Clipart"], train=True, transform=transform)
+        valset = OfficeHome(root, domains=["Clipart"], train=False, transform=transform)
+        testset = OfficeHome(root, domains=["Product", "Art", "Real World"],train=True, transform=transform)
     elif dataset_name == "OfficeHomeArt":
-        trainset = OfficeHome('/shared/lisabdunlap/data', domains=["Art"], train=True, transform=transform)
-        valset = OfficeHome('/shared/lisabdunlap/data', domains=["Art"], train=False, transform=transform)
-        testset = OfficeHome('/shared/lisabdunlap/data', domains=["Clipart", "Product", "Real World"],train=True, transform=transform)
+        trainset = OfficeHome(root, domains=["Art"], train=True, transform=transform)
+        valset = OfficeHome(root, domains=["Art"], train=False, transform=transform)
+        testset = OfficeHome(root, domains=["Clipart", "Product", "Real World"],train=True, transform=transform)
     else:
         raise ValueError(f"{dataset_name} Dataset not supported")
 
@@ -150,7 +146,6 @@ DATASET_CLASSES = {
     "MNIST_SVHN": ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
     "DomainNet": DOMAINNET_CLASSES,
     "DomainNetMini": MINI_DOMAINNET_CLASSES,
-    "DomainNetMiniAug": MINI_DOMAINNET_CLASSES,
     "DomainNetMiniOracle": MINI_DOMAINNET_CLASSES,
     "CUB": CUB_CLASSES,
     "OfficeHomeProduct": OFFICE_HOME_CLASSES,
@@ -163,7 +158,6 @@ DATASET_DOMAINS = {
     "Waterbirds95": ['forest', 'water'],
     "ColoredMNISTBinary": ['red', 'blue'],
     "DomainNetMini": MINI_DOMAINS,
-    "DomainNetMiniAug": MINI_DOMAINS,
     "DomainNetMiniOracle": MINI_DOMAINS,
     "CUB": CUB_DOMAINS,
     "SVHN": ["MNIST", "SVHN"],

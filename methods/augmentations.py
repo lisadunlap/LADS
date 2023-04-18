@@ -438,6 +438,7 @@ class LADS(Augment):
         print(f"...loaded checkpoint with acc {checkpoint['acc']}")
         return net
 
+
 class LADSBias(LADS):
     """
     LADS for biased datasets. Right now this only works for two domains. Instead of specifying a source

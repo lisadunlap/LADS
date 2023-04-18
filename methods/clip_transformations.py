@@ -285,7 +285,7 @@ class ClipMLPZS(ClipMLP):
     
 class AugE2EMLPMulti(ClipMLP):
     """
-    End-to-end version of SALEM with the class consistency loss replaced with the 
+    End-to-end version of LADS with the class consistency loss replaced with the 
     classification loss. (Supposedly) Works on multiple domains.
     """
     def __init__(self, text_prompts, model, cfg, neutral_prompts=[]):
